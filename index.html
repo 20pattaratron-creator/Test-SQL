@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Data Insight SQL Dashboard Pro</title>
+  <meta name="description" content="SQL, SQLite, MySQL, Tableau and Power BI data analytics dashboard web app" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script type="module" src="https://public.tableau.com/javascripts/api/tableau.embedding.3.latest.min.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand-block">
+      <p class="eyebrow">SQLite • SQL • MySQL • Tableau • Power BI • Business Analytics</p>
+      <h1>Data Insight SQL Dashboard Pro</h1>
+      <p class="subtitle">เว็บวิเคราะห์ข้อมูลที่ใช้งานผ่าน Browser ได้: Import CSV, Query SQL, ตรวจคุณภาพข้อมูล, คำนวณ KPI, Business Analytics, Dashboard และเตรียม Query สำหรับ MySQL/Tableau/Power BI</p>
+    </div>
+    <div class="header-actions">
+      <button id="btnSample" class="primary">สร้างข้อมูลตัวอย่าง</button>
+      <button id="btnNewDb">New DB</button>
+      <button id="btnSaveDb">Save .db</button>
+      <button id="btnExportReport">Export Report</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <section class="panel">
+        <h2>ฐานข้อมูล</h2>
+        <p id="dbStatus" class="status">กำลังโหลด SQLite Engine...</p>
+        <label class="file-label">
+          เปิดไฟล์ SQLite (.db/.sqlite)
+          <input id="sqliteFile" type="file" accept=".db,.sqlite,.sqlite3" />
+        </label>
+        <label class="file-label">
+          Import CSV เป็นตารางใหม่
+          <input id="csvFile" type="file" accept=".csv,text/csv" />
+        </label>
+        <label>
+          ชื่อตาราง CSV
+          <input id="csvTableName" type="text" value="uploaded_data" placeholder="uploaded_data" />
+        </label>
+        <label class="form-check">
+          <input id="skipEmptyRows" type="checkbox" checked />
+          <span>ข้ามแถวว่างตอน Import CSV</span>
+        </label>
+        <button id="btnImportCsv" class="wide">Import CSV</button>
+      </section>
+
+      <section class="panel">
+        <div class="section-head compact">
+          <h2>Tables</h2>
+          <button id="btnRefreshTables" class="small-btn">Refresh</button>
+        </div>
+        <div id="tableList" class="table-list empty">ยังไม่มีตาราง</div>
+      </section>
+
+      <section class="panel credit-panel">
+        <h2>Credit</h2>
+        <p>ต่อยอดแนวคิดจาก <strong>SQLite Manager</strong> โดย Goragod Wiriya</p>
+        <p class="small">คงเครดิตและ MIT License ไว้ในไฟล์ NOTICE.md / LICENSE แล้ว</p>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <nav class="tabs" aria-label="Main tabs">
+        <button class="tab active" data-tab="dashboard">Dashboard</button>
+        <button class="tab" data-tab="business">Business Analytics</button>
+        <button class="tab" data-tab="quality">Data Quality</button>
+        <button class="tab" data-tab="sql">SQL Editor</button>
+        <button class="tab" data-tab="browser">Table Browser</button>
+        <button class="tab" data-tab="mysql">MySQL</button>
+        <button class="tab" data-tab="tableau">Tableau</button>
+        <button class="tab" data-tab="powerbi">Power BI</button>
+        <button class="tab" data-tab="guide">คู่มือ</button>
+      </nav>
+
+      <section id="dashboard" class="tab-panel active">
+        <div class="panel hero-panel">
+          <div>
+            <h2>Dashboard Builder</h2>
+            <p>เลือกตารางและคอลัมน์ ระบบจะคำนวณ KPI และสร้างกราฟจาก SQLite ใน Browser ให้ทันที</p>
+          </div>
+          <button id="btnRefreshDashboard">Refresh Dashboard</button>
+        </div>
+
+        <div class="controls-grid panel">
+          <label>ตาราง <select id="dashTable"></select></label>
+          <label>Metric หลัก เช่น sales/revenue <select id="metricColumn"></select></label>
+          <label>Profit <select id="profitColumn"></select></label>
+          <label>วันที่ <select id="dateColumn"></select></label>
+          <label>กลุ่ม เช่น category/region <select id="categoryColumn"></select></label>
+          <label>ลูกค้า <select id="customerColumn"></select></label>
+        </div>
+
+        <div class="metrics" id="kpiCards"></div>
+
+        <div class="chart-grid">
+          <div class="panel">
+            <div class="section-head"><h3>Trend ตามเวลา</h3><span class="badge">Monthly</span></div>
+            <div id="trendChart" class="chart"></div>
+          </div>
+          <div class="panel">
+            <div class="section-head"><h3>ยอดรวมตามกลุ่ม</h3><span class="badge">Top 15</span></div>
+            <div id="categoryChart" class="chart"></div>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="panel">
+            <div class="section-head"><h3>ลูกค้าสูงสุด</h3><span class="badge">Top 10</span></div>
+            <div id="customerChart" class="chart"></div>
+          </div>
+          <div class="panel">
+            <div class="section-head"><h3>Insight อัตโนมัติ</h3><span class="badge">Summary</span></div>
+            <div id="autoInsights" class="insight-box">กดสร้างข้อมูลตัวอย่างหรือ Import CSV ก่อน</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>SQL ที่ใช้สร้าง Dashboard</h3>
+          <pre id="dashboardSql" class="code-box"></pre>
+        </div>
+      </section>
+
+
+      <section id="business" class="tab-panel">
+        <div class="panel hero-panel">
+          <div>
+            <h2>Business Analytics Assistant</h2>
+            <p>วิเคราะห์ข้อมูลเชิงธุรกิจจากตารางที่เลือก พร้อม KPI, Growth, Customer, Product Matrix, RFM/Churn และข้อเสนอแนะเชิงปฏิบัติ</p>
+          </div>
+          <button id="btnRefreshBusiness" class="primary">วิเคราะห์ธุรกิจ</button>
+        </div>
+
+        <div class="controls-grid panel">
+          <label>ตาราง <select id="baTable"></select></label>
+          <label>ยอดขาย/รายได้ <select id="baSalesColumn"></select></label>
+          <label>กำไร <select id="baProfitColumn"></select></label>
+          <label>วันที่ <select id="baDateColumn"></select></label>
+          <label>หมวด/พื้นที่/ช่องทาง <select id="baCategoryColumn"></select></label>
+          <label>ลูกค้า <select id="baCustomerColumn"></select></label>
+          <label>สินค้า <select id="baProductColumn"></select></label>
+          <label>เลขออเดอร์ <select id="baOrderColumn"></select></label>
+          <label>เกณฑ์ Churn Risk (วัน) <input id="baChurnDays" type="number" value="90" min="7" max="730" /></label>
+        </div>
+
+        <div class="metrics" id="baExecutiveCards"></div>
+
+        <div class="chart-grid">
+          <div class="panel">
+            <div class="section-head"><h3>Sales & Profit Trend</h3><span class="badge">MoM</span></div>
+            <div id="baTrendChart" class="chart"></div>
+          </div>
+          <div class="panel">
+            <div class="section-head"><h3>Revenue Share by Segment</h3><span class="badge">Mix</span></div>
+            <div id="baSegmentChart" class="chart"></div>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="panel">
+            <div class="section-head"><h3>Product Strategy Matrix</h3><span class="badge">Sales × Margin</span></div>
+            <div id="baProductMatrix" class="table-wrap"></div>
+          </div>
+          <div class="panel">
+            <div class="section-head"><h3>Customer RFM / Churn</h3><span class="badge">Customer</span></div>
+            <div id="baRfmTable" class="table-wrap"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="section-head"><h3>Recommendation & Action Plan</h3><span class="badge">Business Decision</span></div>
+          <div id="baRecommendationBox" class="insight-box">กดสร้างข้อมูลตัวอย่างหรือ Import CSV ก่อน แล้วกดวิเคราะห์ธุรกิจ</div>
+        </div>
+
+        <div class="panel">
+          <h3>SQL Templates สำหรับ Business Analytics</h3>
+          <pre id="baBusinessSql" class="code-box"></pre>
+        </div>
+
+        <div class="panel guide">
+          <h3>ที่มาของสูตรและแนวคิด</h3>
+          <p>สูตร KPI ใช้แนวคิดมาตรฐานจาก BI/Analytics เช่น Revenue, Profit Margin, AOV, MoM Growth, RFM, Churn Risk และ Product Matrix โดยมีเอกสารอ้างอิงใน <code>docs/BUSINESS_ANALYTICS_SOURCES.md</code></p>
+        </div>
+      </section>
+
+      <section id="quality" class="tab-panel">
+        <div class="panel hero-panel">
+          <div>
+            <h2>Data Quality Check</h2>
+            <p>ตรวจ Missing Value, Duplicate, ชนิดข้อมูล และค่าพื้นฐาน เพื่อเตรียมข้อมูลก่อนทำ Dashboard หรือ Tableau</p>
+          </div>
+          <button id="btnRunQuality">Run Quality Check</button>
+        </div>
+        <div class="controls-grid panel">
+          <label>ตารางที่ต้องการตรวจ <select id="qualityTable"></select></label>
+          <label>จำนวนแถว Preview <input id="qualityLimit" type="number" value="2000" min="10" max="100000" /></label>
+        </div>
+        <div class="metrics" id="qualityCards"></div>
+        <div class="panel">
+          <h3>Missing Value by Column</h3>
+          <div id="missingTable" class="table-wrap"></div>
+        </div>
+        <div class="panel">
+          <h3>ตัวอย่างข้อมูล</h3>
+          <div id="qualityPreview" class="table-wrap"></div>
+        </div>
+      </section>
+
+      <section id="sql" class="tab-panel">
+        <div class="panel">
+          <div class="section-head">
+            <div>
+              <h2>SQL Editor</h2>
+              <p>ใช้ SQLite syntax ในหน้าเว็บนี้ ถ้าจะใช้ MySQL ให้ดูแท็บ MySQL</p>
+            </div>
+            <div class="button-row"><button id="btnRunSql" class="primary">Run SQL</button><button id="btnExportSqlCsv">Export Result CSV</button></div>
+          </div>
+          <label>SQL Query</label>
+          <textarea id="sqlInput" spellcheck="false">SELECT * FROM sales_data LIMIT 20;</textarea>
+          <div class="button-row template-row">
+            <button class="sql-template" data-sql="SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;">List Tables</button>
+            <button class="sql-template" data-sql="SELECT category, SUM(net_sales) AS total_sales FROM sales_data GROUP BY category ORDER BY total_sales DESC;">Sales by Category</button>
+            <button class="sql-template" data-sql="SELECT substr(order_date, 1, 7) AS month, SUM(net_sales) AS total_sales FROM sales_data GROUP BY substr(order_date, 1, 7) ORDER BY month;">Monthly Trend</button>
+            <button class="sql-template" data-sql="SELECT customer_id, customer_name, SUM(net_sales) AS total_sales FROM sales_data GROUP BY customer_id, customer_name ORDER BY total_sales DESC LIMIT 10;">Top Customers</button>
+          </div>
+          <p id="sqlMessage" class="status"></p>
+        </div>
+        <div class="panel">
+          <h3>SQL Result</h3>
+          <div id="sqlResult" class="table-wrap"></div>
+        </div>
+        <div class="panel">
+          <h3>Query History</h3>
+          <div id="queryHistory" class="history-list empty">ยังไม่มีประวัติ</div>
+        </div>
+      </section>
+
+      <section id="browser" class="tab-panel">
+        <div class="panel hero-panel">
+          <div>
+            <h2>Table Browser</h2>
+            <p>ดูข้อมูล แบ่งหน้า ค้นหา และ Export ตารางเป็น CSV</p>
+          </div>
+          <button id="btnExportTableCsv">Export Table CSV</button>
+        </div>
+        <div class="controls-grid panel">
+          <label>ตาราง <select id="browserTable"></select></label>
+          <label>ค้นหา <input id="browserSearch" type="search" placeholder="ค้นหาทุกคอลัมน์" /></label>
+          <label>จำนวนแถว <select id="browserLimit"><option>25</option><option>50</option><option selected>100</option><option>250</option><option>500</option></select></label>
+        </div>
+        <div class="panel"><div id="browserResult" class="table-wrap"></div></div>
+      </section>
+
+      <section id="mysql" class="tab-panel">
+        <div class="panel hero-panel">
+          <div>
+            <h2>MySQL Helper</h2>
+            <p>สร้าง Query สำหรับ MySQL Workbench และเชื่อม Backend API ถ้าต้องการดึงข้อมูล MySQL จริง</p>
+          </div>
+          <button id="btnGenerateMysql">Generate MySQL SQL</button>
+        </div>
+        <div class="controls-grid panel">
+          <label>ชื่อตาราง MySQL <input id="mysqlTable" type="text" value="orders" /></label>
+          <label>Date column <input id="mysqlDate" type="text" value="order_date" /></label>
+          <label>Sales expression <input id="mysqlSales" type="text" value="quantity * unit_price * (1 - discount)" /></label>
+          <label>Profit expression <input id="mysqlProfit" type="text" value="(quantity * unit_price * (1 - discount)) - (quantity * cost)" /></label>
+        </div>
+        <div class="panel">
+          <h3>MySQL Template</h3>
+          <pre id="mysqlSql" class="code-box"></pre>
+        </div>
+        <div class="panel">
+          <h3>เชื่อม Backend MySQL API</h3>
+          <p class="small">ต้องรัน backend-node ก่อน และไม่ควรใส่รหัสผ่าน MySQL ในหน้าเว็บโดยตรง</p>
+          <div class="controls-grid">
+            <label>API Base URL <input id="apiBase" type="url" value="http://localhost:3000" /></label>
+            <label>Read-only SQL <textarea id="apiSql" rows="4">SELECT * FROM orders LIMIT 20</textarea></label>
+          </div>
+          <div class="button-row"><button id="btnApiHealth">Test API</button><button id="btnApiQuery" class="primary">Run API Query</button></div>
+          <p id="apiMessage" class="status"></p>
+          <div id="apiResult" class="table-wrap"></div>
+        </div>
+      </section>
+
+      <section id="tableau" class="tab-panel">
+        <div class="panel hero-panel">
+          <div>
+            <h2>Tableau Helper</h2>
+            <p>เตรียมสูตร Calculated Field และฝัง Tableau Dashboard ที่ Publish แล้ว</p>
+          </div>
+          <button id="btnLoadTableau">Load Tableau</button>
+        </div>
+        <div class="controls-grid panel">
+          <label>Tableau Dashboard URL <input id="tableauUrl" type="url" placeholder="https://public.tableau.com/views/..." /></label>
+          <label>ความสูง iframe/component <input id="tableauHeight" type="number" value="760" min="400" max="1600" /></label>
+        </div>
+        <div class="panel">
+          <h3>Calculated Fields ที่ใช้บ่อย</h3>
+          <pre class="code-box">Net Sales = [Quantity] * [Unit Price] * (1 - [Discount])
+Gross Sales = [Quantity] * [Unit Price]
+Total Cost = [Quantity] * [Cost]
+Profit = [Net Sales] - [Total Cost]
+Profit Margin = IF SUM([Net Sales]) = 0 THEN 0 ELSE SUM([Profit]) / SUM([Net Sales]) END
+Order Month = DATETRUNC('month', [Order Date])
+AOV = SUM([Net Sales]) / COUNTD([Order ID])
+Customer Type = IF { FIXED [Customer ID] : COUNTD([Order ID]) } >= 2 THEN "Repeat" ELSE "One-time" END</pre>
+        </div>
+        <div class="panel"><div id="tableauEmbed" class="tableau-box">ใส่ URL แล้วกด Load Tableau</div></div>
+      </section>
+
+
+      <section id="powerbi" class="tab-panel">
+        <div class="panel hero-panel">
+          <div>
+            <h2>Power BI Helper</h2>
+            <p>ส่วนเสริมสำหรับเตรียม DAX Measures และฝัง Power BI Report ที่ Publish/Embed แล้ว</p>
+          </div>
+          <button id="btnLoadPowerBi">Load Power BI</button>
+        </div>
+        <div class="panel status warn">
+          <strong>ข้อควรระวัง:</strong> ถ้าใช้ Publish to web รายงานอาจถูกเปิดเผยต่อสาธารณะ เหมาะกับข้อมูลตัวอย่างหรือข้อมูลที่เผยแพร่ได้เท่านั้น ถ้าเป็นข้อมูลภายใน ให้ใช้ Secure Embed / Power BI Embedded และตั้งค่าสิทธิ์ผู้ใช้งานให้ถูกต้อง
+        </div>
+        <div class="controls-grid panel">
+          <label>รูปแบบการฝัง
+            <select id="powerBiMode">
+              <option value="public">Publish to web / Public iframe</option>
+              <option value="secure">Secure embed URL</option>
+              <option value="embedded">Power BI Embedded/API placeholder</option>
+            </select>
+          </label>
+          <label>Power BI URL หรือ iframe HTML
+            <textarea id="powerBiUrl" rows="4" placeholder="วาง URL หรือ iframe จาก Power BI เช่น https://app.powerbi.com/view?r=..."></textarea>
+          </label>
+          <label>ความสูง iframe
+            <input id="powerBiHeight" type="number" value="760" min="400" max="1600" />
+          </label>
+        </div>
+        <div class="panel">
+          <h3>DAX Measures ที่ใช้บ่อย</h3>
+          <pre class="code-box">Gross Sales = SUMX(orders, orders[quantity] * orders[unit_price])
+Discount Amount = SUMX(orders, orders[quantity] * orders[unit_price] * orders[discount])
+Net Sales = SUMX(orders, orders[quantity] * orders[unit_price] * (1 - orders[discount]))
+Total Cost = SUMX(orders, orders[quantity] * orders[cost])
+Profit = [Net Sales] - [Total Cost]
+Profit Margin = DIVIDE([Profit], [Net Sales], 0)
+Total Orders = DISTINCTCOUNT(orders[order_id])
+Total Customers = DISTINCTCOUNT(orders[customer_id])
+Average Order Value = DIVIDE([Net Sales], [Total Orders], 0)
+Order Month = FORMAT(orders[order_date], "YYYY-MM")
+MoM Growth = DIVIDE([Net Sales] - CALCULATE([Net Sales], DATEADD('Calendar'[Date], -1, MONTH)), CALCULATE([Net Sales], DATEADD('Calendar'[Date], -1, MONTH)), 0)</pre>
+        </div>
+        <div class="panel">
+          <h3>Power Query / M ตัวอย่างสำหรับเตรียมข้อมูล</h3>
+          <pre class="code-box">let
+    Source = Csv.Document(File.Contents("sample_sales.csv"), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+    PromotedHeaders = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
+    ChangedTypes = Table.TransformColumnTypes(PromotedHeaders, {
+        {"order_date", type date}, {"quantity", Int64.Type}, {"unit_price", type number}, {"discount", type number}, {"cost", type number}
+    }),
+    AddedNetSales = Table.AddColumn(ChangedTypes, "net_sales", each [quantity] * [unit_price] * (1 - [discount]), type number),
+    AddedTotalCost = Table.AddColumn(AddedNetSales, "total_cost", each [quantity] * [cost], type number),
+    AddedProfit = Table.AddColumn(AddedTotalCost, "profit", each [net_sales] - [total_cost], type number)
+in
+    AddedProfit</pre>
+        </div>
+        <div class="panel"><div id="powerBiEmbed" class="tableau-box">ใส่ Power BI URL หรือ iframe HTML แล้วกด Load Power BI</div></div>
+      </section>
+
+      <section id="guide" class="tab-panel">
+        <div class="panel guide">
+          <h2>คู่มือเร็ว</h2>
+          <ol>
+            <li>กด <strong>สร้างข้อมูลตัวอย่าง</strong> หรือ Import CSV</li>
+            <li>เลือกตารางและคอลัมน์ใน Dashboard</li>
+            <li>เปิด Business Analytics เพื่อดูข้อเสนอแนะเชิงธุรกิจจากข้อมูล</li>
+            <li>ตรวจ Data Quality เพื่อลด Missing/Duplicate</li>
+            <li>ใช้ SQL Editor ฝึก Query หรือ Export ผลลัพธ์</li>
+            <li>ใช้ MySQL Helper เพื่อสร้าง Query สำหรับ MySQL Workbench</li>
+            <li>ใช้ Tableau Helper เพื่อเตรียมสูตรและฝัง Dashboard</li>
+            <li>ใช้ Power BI Helper เพื่อเตรียม DAX, Power Query และฝังรายงาน Power BI</li>
+          </ol>
+          <p>เอกสารละเอียดอยู่ในโฟลเดอร์ <code>docs/</code> ได้แก่ INSTALL_TH.md, USER_GUIDE_TH.md, TEST_PLAN_TH.md, SECURITY_TH.md, POWERBI_GUIDE_TH.md</p>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
