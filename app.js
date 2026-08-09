@@ -7,6 +7,9 @@ const state = {
   lastSqlRows: [],
   lastSqlColumns: [],
   queryHistory: [],
+  theme: 'light',
+  objectTypes: {},
+  editing: { table: '', rowid: null, columns: [] },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -96,7 +99,8 @@ async function init() {
       locateFile: (file) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`,
     });
     state.db = new state.SQL.Database();
-    setStatus('พร้อมใช้งาน: สร้าง DB ใหม่หรือ Import CSV ได้', 'ok');
+    initTheme();
+    setStatus('พร้อมใช้งาน: เริ่มด้วยข้อมูลตัวอย่าง หรืออัปโหลด CSV ได้', 'ok');
     bindEvents();
     refreshAll();
   } catch (error) {
@@ -108,6 +112,10 @@ async function init() {
 function bindEvents() {
   document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
   $('btnSample').addEventListener('click', createSampleData);
+  $('btnThemeToggle').addEventListener('click', toggleTheme);
+  $('btnGuideSample').addEventListener('click', () => { createSampleData(); switchTab('dashboard'); });
+  $('btnGuideDashboard').addEventListener('click', () => switchTab('dashboard'));
+  $('btnGuideBusiness').addEventListener('click', () => switchTab('business'));
   $('btnNewDb').addEventListener('click', createNewDb);
   $('btnSaveDb').addEventListener('click', saveDb);
   $('btnExportReport').addEventListener('click', exportReport);
@@ -133,6 +141,15 @@ function bindEvents() {
   $('btnApiQuery').addEventListener('click', apiQuery);
   $('btnLoadTableau').addEventListener('click', loadTableau);
   $('btnLoadPowerBi').addEventListener('click', loadPowerBi);
+  $('btnRefreshRecords').addEventListener('click', renderRecords);
+  $('btnBuildReferenceTables').addEventListener('click', buildReferenceTables);
+  $('recordSourceTable').addEventListener('change', renderRecords);
+  $('recordSearch').addEventListener('input', renderRecords);
+  $('recordLimit').addEventListener('change', renderRecords);
+  $('btnSaveRowEdit').addEventListener('click', saveRowEdit);
+  $('btnExcludeRow').addEventListener('click', () => setEditExclude(true));
+  $('btnIncludeRow').addEventListener('click', () => setEditExclude(false));
+  document.addEventListener('click', handleRowActionClick);
   document.querySelectorAll('.sql-template').forEach(btn => btn.addEventListener('click', () => { $('sqlInput').value = btn.dataset.sql; runSqlEditor(); }));
   $('sqlInput').addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runSqlEditor();
@@ -145,6 +162,33 @@ function switchTab(tabName) {
   if (tabName === 'browser') renderBrowser();
   if (tabName === 'quality') renderQuality();
   if (tabName === 'dashboard') renderDashboard();
+  if (tabName === 'business') renderBusinessAnalytics();
+  if (tabName === 'records') renderRecords();
+}
+
+function initTheme() {
+  const saved = localStorage.getItem('dataInsightTheme');
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  setTheme(saved || (prefersDark ? 'dark' : 'light'), false);
+}
+
+function setTheme(theme, announce = true) {
+  state.theme = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', state.theme);
+  localStorage.setItem('dataInsightTheme', state.theme);
+  const btn = $('btnThemeToggle');
+  if (btn) {
+    btn.textContent = state.theme === 'dark' ? '☀️ โหมดสว่าง' : '🌙 โหมดมืด';
+    btn.setAttribute('aria-pressed', state.theme === 'dark' ? 'true' : 'false');
+  }
+  if (announce) toast(state.theme === 'dark' ? 'เปลี่ยนเป็นโหมดมืดแล้ว' : 'เปลี่ยนเป็นโหมดสว่างแล้ว', 'success');
+  if (state.tables && state.tables.length) {
+    try { renderDashboard(); renderBusinessAnalytics(); } catch (_) {}
+  }
+}
+
+function toggleTheme() {
+  setTheme(state.theme === 'dark' ? 'light' : 'dark');
 }
 
 function createNewDb() {
@@ -164,6 +208,7 @@ CREATE TABLE sales_data (
   order_date TEXT,
   customer_id TEXT,
   customer_name TEXT,
+  product_id TEXT,
   category TEXT,
   product_name TEXT,
   region TEXT,
@@ -177,28 +222,32 @@ CREATE TABLE sales_data (
   discount_amount REAL,
   net_sales REAL,
   total_cost REAL,
-  profit REAL
+  profit REAL,
+  _exclude_from_analysis INTEGER DEFAULT 0,
+  _exclude_reason TEXT,
+  _last_updated_at TEXT
 );
-INSERT INTO sales_data (order_id, order_date, customer_id, customer_name, category, product_name, region, channel, quantity, unit_price, discount, cost, order_status, gross_sales, discount_amount, net_sales, total_cost, profit) VALUES
-('O1001','2026-01-03','C001','Anan','Food','Thai Rice Set','Bangkok','Online',2,1200,0.05,700,'Completed',2400,120,2280,1400,880),
-('O1002','2026-01-05','C002','Mali','Drink','Premium Tea','Chiang Mai','Store',1,850,0,500,'Completed',850,0,850,500,350),
-('O1003','2026-01-12','C001','Anan','Food','Organic Meal Box','Bangkok','Online',3,1500,0.1,800,'Completed',4500,450,4050,2400,1650),
-('O1004','2026-02-01','C003','Suda','Beauty','Skincare Serum','Phuket','Online',4,2200,0.12,1300,'Completed',8800,1056,7744,5200,2544),
-('O1005','2026-02-04','C004','Somchai','Food','Healthy Snack','Khon Kaen','Store',1,900,0,550,'Completed',900,0,900,550,350),
-('O1006','2026-02-10','C005','Naree','Tech','Laptop Accessory','Bangkok','Online',1,12900,0.08,9800,'Completed',12900,1032,11868,9800,2068),
-('O1007','2026-03-02','C002','Mali','Drink','Energy Drink','Chiang Mai','Store',6,250,0,120,'Completed',1500,0,1500,720,780),
-('O1008','2026-03-05','C006','Kanda','Beauty','Beauty Set','Bangkok','Online',2,3200,0.15,1900,'Completed',6400,960,5440,3800,1640),
-('O1009','2026-03-12','C003','Suda','Tech','Smart Device','Phuket','Partner',1,18500,0.05,14000,'Completed',18500,925,17575,14000,3575),
-('O1010','2026-04-01','C007','Prasert','Food','Frozen Food','Udon Thani','Online',8,180,0,90,'Completed',1440,0,1440,720,720),
-('O1011','2026-04-15','C008','Wilai','Drink','Coffee Pack','Bangkok','Store',5,320,0.03,140,'Completed',1600,48,1552,700,852),
-('O1012','2026-05-03','C001','Anan','Beauty','Luxury Cream','Bangkok','Online',1,4500,0.2,2700,'Completed',4500,900,3600,2700,900),
-('O1013','2026-05-09','C009','Pim','Tech','Tablet Bundle','Chiang Mai','Online',1,22000,0.1,17000,'Completed',22000,2200,19800,17000,2800),
-('O1014','2026-06-02','C010','Kit','Food','Seafood Pack','Phuket','Partner',12,150,0,70,'Completed',1800,0,1800,840,960),
-('O1016','2026-06-18','C006','Kanda','Tech','Wireless Earbuds','Bangkok','Online',1,15900,0.05,12000,'Completed',15900,795,15105,12000,3105),
-('O1017','2026-07-04','C004','Somchai','Food','Rice Bowl','Khon Kaen','Store',4,450,0,240,'Completed',1800,0,1800,960,840),
-('O1018','2026-07-10','C012','Dao','Drink','Juice Set','Udon Thani','Partner',9,180,0.02,80,'Completed',1620,32.4,1587.6,720,867.6),
-('O1019','2026-07-21','C013','Win','Beauty','Face Mask','Bangkok','Online',2,2600,0.08,1600,'Completed',5200,416,4784,3200,1584),
-('O1020','2026-08-01','C002','Mali','Tech','Phone Case','Chiang Mai','Online',1,19900,0.07,15000,'Completed',19900,1393,18507,15000,3507);
+INSERT INTO sales_data (order_id, order_date, customer_id, customer_name, product_id, category, product_name, region, channel, quantity, unit_price, discount, cost, order_status, gross_sales, discount_amount, net_sales, total_cost, profit) VALUES
+('O1001','2026-01-03','C001','Anan','P001','Food','Thai Rice Set','Bangkok','Online',2,1200,0.05,700,'Completed',2400,120,2280,1400,880),
+('O1002','2026-01-05','C002','Mali','P002','Drink','Premium Tea','Chiang Mai','Store',1,850,0,500,'Completed',850,0,850,500,350),
+('O1003','2026-01-12','C001','Anan','P003','Food','Organic Meal Box','Bangkok','Online',3,1500,0.1,800,'Completed',4500,450,4050,2400,1650),
+('O1004','2026-02-01','C003','Suda','P004','Beauty','Skincare Serum','Phuket','Online',4,2200,0.12,1300,'Completed',8800,1056,7744,5200,2544),
+('O1005','2026-02-04','C004','Somchai','P005','Food','Healthy Snack','Khon Kaen','Store',1,900,0,550,'Completed',900,0,900,550,350),
+('O1006','2026-02-10','C005','Naree','P006','Tech','Laptop Accessory','Bangkok','Online',1,12900,0.08,9800,'Completed',12900,1032,11868,9800,2068),
+('O1007','2026-03-02','C002','Mali','P007','Drink','Energy Drink','Chiang Mai','Store',6,250,0,120,'Completed',1500,0,1500,720,780),
+('O1008','2026-03-05','C006','Kanda','P008','Beauty','Beauty Set','Bangkok','Online',2,3200,0.15,1900,'Completed',6400,960,5440,3800,1640),
+('O1009','2026-03-12','C003','Suda','P009','Tech','Smart Device','Phuket','Partner',1,18500,0.05,14000,'Completed',18500,925,17575,14000,3575),
+('O1010','2026-04-01','C007','Prasert','P010','Food','Frozen Food','Udon Thani','Online',8,180,0,90,'Completed',1440,0,1440,720,720),
+('O1011','2026-04-15','C008','Wilai','P011','Drink','Coffee Pack','Bangkok','Store',5,320,0.03,140,'Completed',1600,48,1552,700,852),
+('O1012','2026-05-03','C001','Anan','P012','Beauty','Luxury Cream','Bangkok','Online',1,4500,0.2,2700,'Completed',4500,900,3600,2700,900),
+('O1013','2026-05-09','C009','Pim','P013','Tech','Tablet Bundle','Chiang Mai','Online',1,22000,0.1,17000,'Completed',22000,2200,19800,17000,2800),
+('O1014','2026-06-02','C010','Kit','P014','Food','Seafood Pack','Phuket','Partner',12,150,0,70,'Completed',1800,0,1800,840,960),
+('O1015','2026-06-10','C011',NULL,NULL,'Beauty','Mystery Product','Bangkok','Online',1,3000,0.1,2100,'Completed',3000,300,2700,2100,600),
+('O1016','2026-06-18','C006','Kanda','P015','Tech','Wireless Earbuds','Bangkok','Online',1,15900,0.05,12000,'Completed',15900,795,15105,12000,3105),
+('O1017','2026-07-04','C004','Somchai','P016','Food','Rice Bowl','Khon Kaen','Store',4,450,0,240,'Completed',1800,0,1800,960,840),
+('O1018','2026-07-10','C012','Dao','P017','Drink','Juice Set','Udon Thani','Partner',9,180,0.02,80,'Completed',1620,32.4,1587.6,720,867.6),
+('O1019','2026-07-21','C013','Win','P018','Beauty','Face Mask','Bangkok','Online',2,2600,0.08,1600,'Completed',5200,416,4784,3200,1584),
+('O1020','2026-08-01','C002','Mali','P019','Tech','Phone Case','Chiang Mai','Online',1,19900,0.07,15000,'Completed',19900,1393,18507,15000,3507);
 CREATE VIEW vw_monthly_sales AS
 SELECT substr(order_date, 1, 7) AS order_month, SUM(net_sales) AS net_sales, SUM(profit) AS profit
 FROM sales_data
@@ -298,6 +347,7 @@ function addColumnIfMissing(table, headers, name, type = 'REAL') {
 }
 
 function enhanceAnalyticsColumns(table, headers) {
+  ensureGovernanceColumns(table, headers);
   const quantity = findColumn(headers, ['quantity', 'qty']);
   const unitPrice = findColumn(headers, ['unit_price', 'price', 'unitprice']);
   const discount = findColumn(headers, ['discount', 'discount_rate']);
@@ -399,13 +449,15 @@ function refreshAll() {
   renderDashboard();
   renderBusinessAnalytics();
   renderQuality();
+  renderRecords();
   generateMysqlSql();
 }
 
 function refreshTables() {
   if (!state.db) return;
-  const result = query("SELECT name FROM sqlite_master WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name;");
+  const result = query("SELECT name, type FROM sqlite_master WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name;");
   state.tables = result.rows.map(r => r.name);
+  state.objectTypes = Object.fromEntries(result.rows.map(r => [r.name, r.type]));
   const list = $('tableList');
   if (!state.tables.length) {
     list.className = 'table-list empty';
@@ -413,7 +465,7 @@ function refreshTables() {
     return;
   }
   list.className = 'table-list';
-  list.innerHTML = state.tables.map(t => `<div class="table-item"><span>${escapeHtml(t)}</span><button data-open-table="${escapeHtml(t)}">ดู</button></div>`).join('');
+  list.innerHTML = state.tables.map(t => `<div class="table-item"><span>${escapeHtml(t)} <small>${escapeHtml(getObjectType(t))}</small></span><button data-open-table="${escapeHtml(t)}">ดู</button></div>`).join('');
   list.querySelectorAll('[data-open-table]').forEach(btn => btn.addEventListener('click', () => {
     $('browserTable').value = btn.dataset.openTable;
     switchTab('browser');
@@ -423,7 +475,7 @@ function refreshTables() {
 
 function populateTableSelects() {
   const options = state.tables.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-  ['dashTable', 'qualityTable', 'browserTable', 'baTable'].forEach(id => {
+  ['dashTable', 'qualityTable', 'browserTable', 'baTable', 'recordSourceTable'].forEach(id => {
     const sel = $(id);
     const old = sel.value;
     sel.innerHTML = options;
@@ -434,6 +486,50 @@ function populateTableSelects() {
 function getColumns(table) {
   if (!table) return [];
   return query(`PRAGMA table_info(${quoteIdent(table)});`).rows.map(r => ({ name: r.name, type: r.type }));
+}
+
+function getObjectType(name) {
+  return (state.objectTypes && state.objectTypes[name]) || query(`SELECT type FROM sqlite_master WHERE name = ${sqlLiteral(name)} LIMIT 1;`).rows[0]?.type || 'table';
+}
+
+function sqlLiteral(value) {
+  return "'" + String(value ?? '').replaceAll("'", "''") + "'";
+}
+
+function isEditableTable(table) {
+  return Boolean(table) && getObjectType(table) === 'table';
+}
+
+function hasColumn(table, columnName) {
+  return getColumns(table).some(c => c.name.toLowerCase() === String(columnName).toLowerCase());
+}
+
+function ensureGovernanceColumns(table, headers = null) {
+  if (!table || getObjectType(table) === 'view') return;
+  const current = headers || getColumns(table).map(c => c.name);
+  const add = (name, type) => {
+    if (!current.some(c => String(c).toLowerCase() === name.toLowerCase())) {
+      run(`ALTER TABLE ${quoteIdent(table)} ADD COLUMN ${quoteIdent(name)} ${type};`);
+      current.push(name);
+    }
+  };
+  add('_exclude_from_analysis', 'INTEGER DEFAULT 0');
+  add('_exclude_reason', 'TEXT');
+  add('_last_updated_at', 'TEXT');
+}
+
+function analysisWhereSql(table) {
+  try {
+    return hasColumn(table, '_exclude_from_analysis') ? 'WHERE COALESCE("_exclude_from_analysis", 0) = 0' : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function getAnalysisRows(table, limit = 100000) {
+  if (!table) return [];
+  const where = analysisWhereSql(table);
+  return query(`SELECT * FROM ${quoteIdent(table)} ${where} LIMIT ${Number(limit) || 100000};`).rows;
 }
 
 function populateDashboardColumns() {
@@ -544,7 +640,7 @@ function renderBusinessAnalytics() {
   const product = $('baProductColumn').value;
   const order = $('baOrderColumn').value;
   const churnDays = Number($('baChurnDays').value || 90);
-  const rows = query(`SELECT * FROM ${quoteIdent(table)} LIMIT 100000;`).rows;
+  const rows = getAnalysisRows(table, 100000);
   const totalSales = rows.reduce((s,r) => s + Number(r[sales] || 0), 0);
   const totalProfit = profit ? rows.reduce((s,r) => s + Number(r[profit] || 0), 0) : null;
   const totalRows = rows.length;
@@ -684,7 +780,7 @@ function renderDashboard() {
   const date = $('dateColumn').value;
   const category = $('categoryColumn').value;
   const customer = $('customerColumn').value;
-  const baseRows = query(`SELECT * FROM ${quoteIdent(table)} LIMIT 100000;`).rows;
+  const baseRows = getAnalysisRows(table, 100000);
   const totalMetric = baseRows.reduce((sum, r) => sum + Number(r[metric] || 0), 0);
   const totalProfit = profit ? baseRows.reduce((sum, r) => sum + Number(r[profit] || 0), 0) : null;
   const rowCount = baseRows.length;
@@ -713,35 +809,45 @@ function clearCharts() {
   $('dashboardSql').textContent = '';
 }
 
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
 function plot(divId, data, layout) {
   const el = $(divId);
   if (!window.Plotly) { el.textContent = 'Plotly ไม่พร้อมใช้งาน'; return; }
-  window.Plotly.newPlot(el, data, {
+  const textColor = cssVar('--text') || '#0f172a';
+  const borderColor = cssVar('--border') || '#bfdbfe';
+  const accentColor = cssVar('--accent') || '#2563eb';
+  const themedData = data.map((trace) => ({ marker: { color: accentColor }, ...trace, line: { color: accentColor, ...(trace.line || {}) } }));
+  window.Plotly.newPlot(el, themedData, {
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor: 'rgba(0,0,0,0)',
-    font: { color: '#e5e7eb' },
+    font: { color: textColor },
     margin: { t: 20, r: 18, b: 48, l: 68 },
-    ...layout,
+    ...(layout || {}),
+    xaxis: { gridcolor: borderColor, zerolinecolor: borderColor, ...(layout && layout.xaxis ? layout.xaxis : {}) },
+    yaxis: { gridcolor: borderColor, zerolinecolor: borderColor, ...(layout && layout.yaxis ? layout.yaxis : {}) },
   }, { responsive: true, displaylogo: false });
 }
 
 function renderTrendChart(table, metric, date) {
   if (!date) { $('trendChart').textContent = 'ไม่ได้เลือกคอลัมน์วันที่'; return; }
-  const sql = `SELECT substr(${quoteIdent(date)}, 1, 7) AS period, SUM(COALESCE(${quoteIdent(metric)}, 0)) AS value FROM ${quoteIdent(table)} GROUP BY substr(${quoteIdent(date)}, 1, 7) ORDER BY period;`;
+  const sql = `SELECT substr(${quoteIdent(date)}, 1, 7) AS period, SUM(COALESCE(${quoteIdent(metric)}, 0)) AS value FROM ${quoteIdent(table)} ${analysisWhereSql(table)} GROUP BY substr(${quoteIdent(date)}, 1, 7) ORDER BY period;`;
   const rows = query(sql).rows;
   plot('trendChart', [{ x: rows.map(r => r.period), y: rows.map(r => r.value), type: 'scatter', mode: 'lines+markers', line: { width: 3 } }], { xaxis: { title: date }, yaxis: { title: metric } });
 }
 
 function renderCategoryChart(table, metric, category) {
   if (!category) { $('categoryChart').textContent = 'ไม่ได้เลือกคอลัมน์กลุ่ม'; return; }
-  const sql = `SELECT ${quoteIdent(category)} AS label, SUM(COALESCE(${quoteIdent(metric)}, 0)) AS value FROM ${quoteIdent(table)} GROUP BY ${quoteIdent(category)} ORDER BY value DESC LIMIT 15;`;
+  const sql = `SELECT ${quoteIdent(category)} AS label, SUM(COALESCE(${quoteIdent(metric)}, 0)) AS value FROM ${quoteIdent(table)} ${analysisWhereSql(table)} GROUP BY ${quoteIdent(category)} ORDER BY value DESC LIMIT 15;`;
   const rows = query(sql).rows;
   plot('categoryChart', [{ x: rows.map(r => r.label), y: rows.map(r => r.value), type: 'bar' }], { xaxis: { title: category }, yaxis: { title: metric } });
 }
 
 function renderCustomerChart(table, metric, customer) {
   if (!customer) { $('customerChart').textContent = 'ไม่ได้เลือกคอลัมน์ลูกค้า'; return; }
-  const sql = `SELECT ${quoteIdent(customer)} AS label, SUM(COALESCE(${quoteIdent(metric)}, 0)) AS value FROM ${quoteIdent(table)} GROUP BY ${quoteIdent(customer)} ORDER BY value DESC LIMIT 10;`;
+  const sql = `SELECT ${quoteIdent(customer)} AS label, SUM(COALESCE(${quoteIdent(metric)}, 0)) AS value FROM ${quoteIdent(table)} ${analysisWhereSql(table)} GROUP BY ${quoteIdent(customer)} ORDER BY value DESC LIMIT 10;`;
   const rows = query(sql).rows;
   plot('customerChart', [{ x: rows.map(r => r.value), y: rows.map(r => String(r.label)), type: 'bar', orientation: 'h' }], { xaxis: { title: metric }, yaxis: { automargin: true } });
 }
@@ -848,10 +954,268 @@ function renderBrowser() {
   if (!table) { $('browserResult').innerHTML = 'ยังไม่มีตาราง'; return; }
   const limit = Number($('browserLimit').value || 100);
   const search = $('browserSearch').value.trim().toLowerCase();
+  const editable = isEditableTable(table);
+  if (editable) ensureGovernanceColumns(table);
   const cols = getColumns(table).map(c => c.name);
-  let rows = query(`SELECT * FROM ${quoteIdent(table)} LIMIT 10000;`).rows;
-  if (search) rows = rows.filter(r => cols.some(c => String(r[c] ?? '').toLowerCase().includes(search)));
-  $('browserResult').innerHTML = renderTable(cols, rows.slice(0, limit));
+  let rows = query(`SELECT ${editable ? 'rowid AS _rowid, ' : ''}* FROM ${quoteIdent(table)} LIMIT 10000;`).rows;
+  if (search) rows = rows.filter(r => ['_rowid', ...cols].some(c => String(r[c] ?? '').toLowerCase().includes(search)));
+  $('browserResult').innerHTML = editable ? renderEditableTable(table, cols, rows.slice(0, limit)) : renderTable(cols, rows.slice(0, limit));
+}
+
+
+function handleRowActionClick(event) {
+  const btn = event.target.closest('[data-edit-row]');
+  if (!btn) return;
+  loadRowForEdit(btn.dataset.table, Number(btn.dataset.rowid));
+  switchTab('records');
+}
+
+function getSmartColumns(table) {
+  const cols = getColumns(table).map(c => c.name);
+  return {
+    cols,
+    customerId: findColumn(cols, ['customer_id', 'customerid', 'customer', 'client_id']),
+    customerName: findColumn(cols, ['customer_name', 'customername', 'name', 'fullname']),
+    province: findColumn(cols, ['province', 'จังหวัด']),
+    region: findColumn(cols, ['region', 'area', 'พื้นที่']),
+    productId: findColumn(cols, ['product_id', 'productid', 'sku', 'item_id']),
+    productName: findColumn(cols, ['product_name', 'productname', 'product', 'item_name', 'item']),
+    category: findColumn(cols, ['category', 'หมวด', 'group']),
+    date: findColumn(cols, ['order_date', 'date', 'created_at', 'วันที่']),
+    order: findColumn(cols, ['order_id', 'transaction_id', 'invoice']),
+    sales: findColumn(cols, ['net_sales', 'sales', 'revenue', 'amount', 'total']),
+    profit: findColumn(cols, ['profit', 'gross_profit'])
+  };
+}
+
+function renderRecords() {
+  if (!$('recordSourceTable')) return;
+  const table = $('recordSourceTable').value || state.tables[0];
+  if (table && $('recordSourceTable').value !== table) $('recordSourceTable').value = table;
+  if (!table) {
+    $('recordCards').innerHTML = '<div class="metric-card"><div class="label">สถานะ</div><div class="value">ไม่มีข้อมูล</div><div class="hint">สร้างข้อมูลตัวอย่างหรือ Import CSV ก่อน</div></div>';
+    $('customerReferenceTable').innerHTML = '';
+    $('productReferenceTable').innerHTML = '';
+    $('recordIssueTable').innerHTML = '';
+    return;
+  }
+  const editable = isEditableTable(table);
+  if (editable) ensureGovernanceColumns(table);
+  const smart = getSmartColumns(table);
+  const rows = query(`SELECT ${editable ? 'rowid AS _rowid, ' : ''}* FROM ${quoteIdent(table)} LIMIT 100000;`).rows;
+  const includedRows = rows.filter(r => Number(r._exclude_from_analysis || 0) !== 1);
+  const excludedRows = rows.length - includedRows.length;
+  const customerRows = buildCustomerReferenceRows(includedRows, smart);
+  const productRows = buildProductReferenceRows(includedRows, smart);
+  const issues = buildIssueRows(rows, smart, Number($('recordLimit').value || 100), editable);
+  const search = $('recordSearch').value.trim().toLowerCase();
+  const filterText = (r) => Object.values(r).some(v => String(v ?? '').toLowerCase().includes(search));
+  const filteredCustomers = search ? customerRows.filter(filterText) : customerRows;
+  const filteredProducts = search ? productRows.filter(filterText) : productRows;
+  const filteredIssues = search ? issues.filter(filterText) : issues;
+
+  $('recordCards').innerHTML = [
+    ['Rows ทั้งหมด', formatNumber(rows.length,0), table],
+    ['Rows ที่ใช้คำนวณ', formatNumber(includedRows.length,0), 'ไม่รวมแถวที่ถูก exclude'],
+    ['Excluded Rows', formatNumber(excludedRows,0), 'ไม่นำไปคำนวณ'],
+    ['Customers', formatNumber(customerRows.length,0), smart.customerId || 'ไม่พบ customer_id'],
+    ['Products', formatNumber(productRows.length,0), smart.productId || smart.productName || 'ไม่พบ product_id/product_name'],
+    ['แถวที่ควรตรวจ', formatNumber(issues.length,0), 'missing / excluded / data issue']
+  ].map(([l,v,h]) => `<div class="metric-card"><div class="label">${escapeHtml(l)}</div><div class="value">${escapeHtml(v)}</div><div class="hint">${escapeHtml(h)}</div></div>`).join('');
+
+  $('customerReferenceTable').innerHTML = smart.customerId
+    ? renderTable(['customer_id','customer_name','province','region','orders','total_sales','total_profit','last_order_date'], filteredCustomers.slice(0, 100))
+    : '<p class="status warn">ไม่พบคอลัมน์ customer_id ในตารางนี้</p>';
+  $('productReferenceTable').innerHTML = (smart.productId || smart.productName)
+    ? renderTable(['product_id','product_name','category','rows','total_sales','total_profit','profit_margin'], filteredProducts.slice(0, 100))
+    : '<p class="status warn">ไม่พบคอลัมน์ product_id หรือ product_name ในตารางนี้</p>';
+  $('recordIssueTable').innerHTML = editable
+    ? renderIssueTable(table, filteredIssues.slice(0, Number($('recordLimit').value || 100)))
+    : '<p class="status warn">ตารางนี้เป็น View จึงแก้ไขแถวโดยตรงไม่ได้ ให้เลือกตารางจริงแทน</p>';
+}
+
+function buildCustomerReferenceRows(rows, smart) {
+  if (!smart.customerId) return [];
+  const map = new Map();
+  rows.forEach(r => {
+    const id = String(r[smart.customerId] ?? '').trim() || 'ไม่ระบุ';
+    const old = map.get(id) || { customer_id: id, customer_name: '', province: '', region: '', ordersSet: new Set(), orders: 0, total_sales: 0, total_profit: 0, last_order_date: '' };
+    if (smart.customerName && r[smart.customerName]) old.customer_name = r[smart.customerName];
+    if (smart.province && r[smart.province]) old.province = r[smart.province];
+    if (smart.region && r[smart.region]) old.region = r[smart.region];
+    if (smart.order && r[smart.order]) old.ordersSet.add(r[smart.order]); else old.orders += 1;
+    if (smart.sales) old.total_sales += Number(r[smart.sales] || 0);
+    if (smart.profit) old.total_profit += Number(r[smart.profit] || 0);
+    if (smart.date && r[smart.date] && String(r[smart.date]) > String(old.last_order_date || '')) old.last_order_date = r[smart.date];
+    map.set(id, old);
+  });
+  return [...map.values()].map(r => ({
+    customer_id: r.customer_id,
+    customer_name: r.customer_name || '-',
+    province: r.province || '-',
+    region: r.region || '-',
+    orders: smart.order ? r.ordersSet.size : r.orders,
+    total_sales: Number(r.total_sales.toFixed(2)),
+    total_profit: Number(r.total_profit.toFixed(2)),
+    last_order_date: r.last_order_date || '-'
+  })).sort((a,b) => b.total_sales - a.total_sales);
+}
+
+function buildProductReferenceRows(rows, smart) {
+  const idCol = smart.productId || smart.productName;
+  if (!idCol) return [];
+  const map = new Map();
+  rows.forEach(r => {
+    const id = String(r[idCol] ?? '').trim() || 'ไม่ระบุ';
+    const old = map.get(id) || { product_id: id, product_name: '', category: '', rows: 0, total_sales: 0, total_profit: 0 };
+    if (smart.productName && r[smart.productName]) old.product_name = r[smart.productName];
+    if (smart.category && r[smart.category]) old.category = r[smart.category];
+    old.rows += 1;
+    if (smart.sales) old.total_sales += Number(r[smart.sales] || 0);
+    if (smart.profit) old.total_profit += Number(r[smart.profit] || 0);
+    map.set(id, old);
+  });
+  return [...map.values()].map(r => ({
+    product_id: r.product_id,
+    product_name: r.product_name || r.product_id,
+    category: r.category || '-',
+    rows: r.rows,
+    total_sales: Number(r.total_sales.toFixed(2)),
+    total_profit: Number(r.total_profit.toFixed(2)),
+    profit_margin: r.total_sales ? `${formatNumber((r.total_profit / r.total_sales) * 100)}%` : '-'
+  })).sort((a,b) => b.total_sales - a.total_sales);
+}
+
+function buildIssueRows(rows, smart, limit, editable) {
+  if (!editable) return [];
+  const important = [smart.customerId, smart.productId || smart.productName, smart.date, smart.sales].filter(Boolean);
+  const items = [];
+  for (const r of rows) {
+    const issues = [];
+    important.forEach(c => {
+      if (r[c] === null || r[c] === undefined || String(r[c]).trim() === '') issues.push(`${c} ว่าง`);
+    });
+    if (Number(r._exclude_from_analysis || 0) === 1) issues.push('ถูกตั้งค่าไม่นำไปคำนวณ');
+    if (issues.length) {
+      items.push({
+        _rowid: r._rowid,
+        issues: issues.join(', '),
+        customer_id: smart.customerId ? r[smart.customerId] : '-',
+        customer_name: smart.customerName ? r[smart.customerName] : '-',
+        product_id: smart.productId ? r[smart.productId] : '-',
+        product_name: smart.productName ? r[smart.productName] : '-',
+        date: smart.date ? r[smart.date] : '-',
+        sales: smart.sales ? r[smart.sales] : '-',
+        excluded: Number(r._exclude_from_analysis || 0) === 1 ? 'Yes' : 'No',
+        reason: r._exclude_reason || ''
+      });
+    }
+    if (items.length >= limit) break;
+  }
+  return items;
+}
+
+function renderIssueTable(table, rows) {
+  if (!rows.length) return '<p class="status ok">ไม่พบแถวที่มีปัญหาในคอลัมน์สำคัญตามที่ระบบตรวจได้</p>';
+  const cols = ['action','_rowid','issues','customer_id','customer_name','product_id','product_name','date','sales','excluded','reason'];
+  const thead = `<thead><tr>${cols.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>`;
+  const tbody = `<tbody>${rows.map(r => `<tr>${cols.map(c => c === 'action' ? `<td><button class="small-btn" data-edit-row="${escapeHtml(r._rowid)}" data-table="${escapeHtml(table)}">แก้ไข</button></td>` : `<td>${escapeHtml(r[c])}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  return `<table>${thead}${tbody}</table>`;
+}
+
+function renderEditableTable(table, columns, rows) {
+  const displayCols = ['action', '_rowid', ...columns];
+  const thead = `<thead><tr>${displayCols.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>`;
+  const tbody = `<tbody>${rows.map(r => `<tr>${displayCols.map(c => {
+    if (c === 'action') return `<td><button class="small-btn" data-edit-row="${escapeHtml(r._rowid)}" data-table="${escapeHtml(table)}">แก้ไข</button></td>`;
+    return `<td>${escapeHtml(r[c])}</td>`;
+  }).join('')}</tr>`).join('')}</tbody>`;
+  return `<table>${thead}${tbody}</table>`;
+}
+
+function loadRowForEdit(table, rowid) {
+  if (!isEditableTable(table) || !Number.isFinite(rowid)) return toast('เลือกแถวที่แก้ไขได้จากตารางจริงเท่านั้น', 'error');
+  ensureGovernanceColumns(table);
+  const cols = getColumns(table).map(c => c.name);
+  const row = query(`SELECT rowid AS _rowid, * FROM ${quoteIdent(table)} WHERE rowid = ${Number(rowid)} LIMIT 1;`).rows[0];
+  if (!row) return toast('ไม่พบแถวข้อมูลที่เลือก', 'error');
+  state.editing = { table, rowid, columns: cols };
+  $('editTableName').value = table;
+  $('editRowId').value = rowid;
+  $('editRowBadge').textContent = `${table} / rowid ${rowid}`;
+  $('editExcludeFlag').checked = Number(row._exclude_from_analysis || 0) === 1;
+  $('editExcludeReason').value = row._exclude_reason || '';
+  $('editForm').innerHTML = cols
+    .filter(c => !['_exclude_from_analysis','_exclude_reason','_last_updated_at'].includes(c))
+    .map(c => `<label>${escapeHtml(c)}<input data-edit-field="${escapeHtml(c)}" type="text" value="${escapeHtml(row[c] ?? '')}" /></label>`).join('');
+  $('editMessage').className = 'status ok';
+  $('editMessage').textContent = 'โหลดข้อมูลแถวนี้แล้ว สามารถแก้ไขและกดบันทึกได้';
+}
+
+function saveRowEdit() {
+  const { table, rowid, columns } = state.editing || {};
+  if (!table || !rowid) return toast('กรุณาเลือกแถวที่ต้องการแก้ไขก่อน', 'error');
+  const fields = [...document.querySelectorAll('[data-edit-field]')];
+  const editableColumns = fields.map(input => input.dataset.editField).filter(c => columns.includes(c));
+  const values = fields.map(input => input.value === '' ? null : input.value);
+  const setParts = editableColumns.map(c => `${quoteIdent(c)} = ?`);
+  setParts.push(`${quoteIdent('_exclude_from_analysis')} = ?`);
+  setParts.push(`${quoteIdent('_exclude_reason')} = ?`);
+  setParts.push(`${quoteIdent('_last_updated_at')} = ?`);
+  values.push($('editExcludeFlag').checked ? 1 : 0);
+  values.push($('editExcludeReason').value || null);
+  values.push(new Date().toISOString());
+  try {
+    const stmt = state.db.prepare(`UPDATE ${quoteIdent(table)} SET ${setParts.join(', ')} WHERE rowid = ?;`);
+    stmt.run([...values, Number(rowid)]);
+    stmt.free();
+    $('editMessage').className = 'status ok';
+    $('editMessage').textContent = 'บันทึกข้อมูลสำเร็จ Dashboard และ Business Analytics จะไม่นำแถวที่ exclude ไปคำนวณ';
+    refreshAll();
+    toast('บันทึกการแก้ไขสำเร็จ', 'success');
+  } catch (error) {
+    console.error(error);
+    $('editMessage').className = 'status error';
+    $('editMessage').textContent = `บันทึกไม่สำเร็จ: ${error.message}`;
+  }
+}
+
+function setEditExclude(flag) {
+  if (!state.editing || !state.editing.table) return toast('กรุณาเลือกแถวก่อน', 'error');
+  $('editExcludeFlag').checked = flag;
+  if (flag && !$('editExcludeReason').value) $('editExcludeReason').value = 'ไม่นำแถวนี้ไปคำนวณ รอตรวจสอบข้อมูล';
+  saveRowEdit();
+}
+
+function buildReferenceTables() {
+  const table = $('recordSourceTable').value || state.tables[0];
+  if (!table) return toast('ยังไม่มีตารางข้อมูลหลัก', 'error');
+  const smart = getSmartColumns(table);
+  const rows = getAnalysisRows(table, 100000);
+  const customers = buildCustomerReferenceRows(rows, smart);
+  const products = buildProductReferenceRows(rows, smart);
+  try {
+    run('DROP TABLE IF EXISTS ref_customers;');
+    run('CREATE TABLE ref_customers (customer_id TEXT PRIMARY KEY, customer_name TEXT, province TEXT, region TEXT, orders INTEGER, total_sales REAL, total_profit REAL, last_order_date TEXT);');
+    let stmt = state.db.prepare('INSERT INTO ref_customers VALUES (?, ?, ?, ?, ?, ?, ?, ?);');
+    state.db.run('BEGIN TRANSACTION');
+    customers.forEach(r => stmt.run([r.customer_id, r.customer_name, r.province, r.region, r.orders, r.total_sales, r.total_profit, r.last_order_date]));
+    state.db.run('COMMIT');
+    stmt.free();
+    run('DROP TABLE IF EXISTS ref_products;');
+    run('CREATE TABLE ref_products (product_id TEXT PRIMARY KEY, product_name TEXT, category TEXT, rows INTEGER, total_sales REAL, total_profit REAL, profit_margin TEXT);');
+    stmt = state.db.prepare('INSERT INTO ref_products VALUES (?, ?, ?, ?, ?, ?, ?);');
+    state.db.run('BEGIN TRANSACTION');
+    products.forEach(r => stmt.run([r.product_id, r.product_name, r.category, r.rows, r.total_sales, r.total_profit, r.profit_margin]));
+    state.db.run('COMMIT');
+    stmt.free();
+    refreshAll();
+    toast(`สร้าง ref_customers (${customers.length}) และ ref_products (${products.length}) สำเร็จ`, 'success');
+  } catch (error) {
+    try { state.db.run('ROLLBACK'); } catch (_) {}
+    console.error(error);
+    toast(`สร้างตารางอ้างอิงไม่สำเร็จ: ${error.message}`, 'error');
+  }
 }
 
 function renderTable(columns, rows) {

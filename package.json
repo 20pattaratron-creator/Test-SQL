@@ -1,23 +1,17 @@
 {
-  "name": "data-insight-mysql-api",
-  "version": "2.0.0",
-  "description": "Read-only MySQL API for Data Insight SQL Dashboard Pro",
-  "main": "server.js",
-  "type": "commonjs",
+  "name": "data-insight-sql-dashboard-pro-friendly-editable",
+  "version": "2.5.0",
+  "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "check": "node --check server.js"
+    "check": "node --check app.js && node --check api/health.js && node --check api/query.js && node --check backend-node/server.js",
+    "serve": "python3 -m http.server 8080",
+    "vercel-dev": "vercel dev"
   },
   "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.18.3",
-    "express-rate-limit": "^7.4.1",
-    "helmet": "^7.1.0",
     "mysql2": "^3.11.5"
   },
   "devDependencies": {
-    "nodemon": "^3.1.7"
-  }
+    "vercel": "^46.0.0"
+  },
+  "description": "Data Insight SQL Dashboard Pro Friendly with reference tables, editable records, blue light/dark theme, Business Analytics, SQLite, MySQL, Tableau and Power BI add-on"
 }

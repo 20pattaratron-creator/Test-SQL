@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Data Insight SQL Dashboard Pro</title>
+  <title>Data Insight SQL Dashboard Pro Friendly</title>
   <meta name="description" content="SQL, SQLite, MySQL, Tableau and Power BI data analytics dashboard web app" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
@@ -14,45 +14,56 @@
   <header class="app-header">
     <div class="brand-block">
       <p class="eyebrow">SQLite • SQL • MySQL • Tableau • Power BI • Business Analytics</p>
-      <h1>Data Insight SQL Dashboard Pro</h1>
-      <p class="subtitle">เว็บวิเคราะห์ข้อมูลที่ใช้งานผ่าน Browser ได้: Import CSV, Query SQL, ตรวจคุณภาพข้อมูล, คำนวณ KPI, Business Analytics, Dashboard และเตรียม Query สำหรับ MySQL/Tableau/Power BI</p>
+      <h1>Data Insight SQL Dashboard Pro Friendly</h1>
+      <p class="subtitle">เว็บวิเคราะห์ข้อมูลธีมน้ำเงินสำหรับผู้เริ่มต้น: อัปโหลดไฟล์ กดดู Dashboard วิเคราะห์ธุรกิจ ตรวจคุณภาพข้อมูล และต่อยอดไป SQL / MySQL / Tableau / Power BI ได้เมื่อพร้อม</p>
     </div>
     <div class="header-actions">
-      <button id="btnSample" class="primary">สร้างข้อมูลตัวอย่าง</button>
-      <button id="btnNewDb">New DB</button>
-      <button id="btnSaveDb">Save .db</button>
-      <button id="btnExportReport">Export Report</button>
+      <button id="btnSample" class="primary">เริ่มด้วยข้อมูลตัวอย่าง</button>
+      <button id="btnThemeToggle" class="theme-toggle" aria-pressed="false">🌙 โหมดมืด</button>
+      <button id="btnNewDb">สร้างฐานข้อมูลว่าง</button>
+      <button id="btnSaveDb">บันทึก .db</button>
+      <button id="btnExportReport">ดาวน์โหลดรายงาน</button>
     </div>
   </header>
 
   <main class="layout">
     <aside class="sidebar">
+      <section class="panel beginner-panel">
+        <h2>เริ่มจากตรงนี้</h2>
+        <div class="step-list mini">
+          <div><span>1</span><p>กดข้อมูลตัวอย่าง หรือเลือกไฟล์ CSV ของคุณ</p></div>
+          <div><span>2</span><p>ดู Dashboard / Business Analytics ได้โดยไม่ต้องเขียน SQL</p></div>
+          <div><span>3</span><p>ค่อยเปิด SQL Editor เมื่ออยากวิเคราะห์ลึกขึ้น</p></div>
+        </div>
+      </section>
+
       <section class="panel">
-        <h2>ฐานข้อมูล</h2>
+        <h2>ข้อมูลของคุณ</h2>
         <p id="dbStatus" class="status">กำลังโหลด SQLite Engine...</p>
         <label class="file-label">
-          เปิดไฟล์ SQLite (.db/.sqlite)
+          เปิดไฟล์ฐานข้อมูล SQLite (.db/.sqlite)
           <input id="sqliteFile" type="file" accept=".db,.sqlite,.sqlite3" />
         </label>
         <label class="file-label">
-          Import CSV เป็นตารางใหม่
+          อัปโหลดไฟล์ CSV เป็นตารางใหม่
           <input id="csvFile" type="file" accept=".csv,text/csv" />
         </label>
         <label>
-          ชื่อตาราง CSV
+          ตั้งชื่อตารางที่นำเข้า
           <input id="csvTableName" type="text" value="uploaded_data" placeholder="uploaded_data" />
         </label>
         <label class="form-check">
           <input id="skipEmptyRows" type="checkbox" checked />
           <span>ข้ามแถวว่างตอน Import CSV</span>
         </label>
-        <button id="btnImportCsv" class="wide">Import CSV</button>
+        <button id="btnImportCsv" class="wide primary">อัปโหลดและสร้างตาราง</button>
+        <p class="help-text">แนะนำให้ใช้ไฟล์ CSV ที่มีหัวตาราง เช่น order_date, customer_id, product_name, category, net_sales, profit</p>
       </section>
 
       <section class="panel">
         <div class="section-head compact">
-          <h2>Tables</h2>
-          <button id="btnRefreshTables" class="small-btn">Refresh</button>
+          <h2>ตารางข้อมูล</h2>
+          <button id="btnRefreshTables" class="small-btn">โหลดใหม่</button>
         </div>
         <div id="tableList" class="table-list empty">ยังไม่มีตาราง</div>
       </section>
@@ -66,9 +77,11 @@
 
     <section class="workspace">
       <nav class="tabs" aria-label="Main tabs">
-        <button class="tab active" data-tab="dashboard">Dashboard</button>
+        <button class="tab active" data-tab="home">เริ่มต้น</button>
+        <button class="tab" data-tab="dashboard">Dashboard</button>
         <button class="tab" data-tab="business">Business Analytics</button>
         <button class="tab" data-tab="quality">Data Quality</button>
+        <button class="tab" data-tab="records">ข้อมูลอ้างอิง/แก้ไขข้อมูล</button>
         <button class="tab" data-tab="sql">SQL Editor</button>
         <button class="tab" data-tab="browser">Table Browser</button>
         <button class="tab" data-tab="mysql">MySQL</button>
@@ -77,21 +90,77 @@
         <button class="tab" data-tab="guide">คู่มือ</button>
       </nav>
 
-      <section id="dashboard" class="tab-panel active">
+
+      <section id="home" class="tab-panel active">
+        <div class="panel welcome-panel">
+          <div>
+            <span class="badge">Beginner Friendly</span>
+            <h2>เริ่มวิเคราะห์ข้อมูลโดยไม่ต้องเขียน SQL</h2>
+            <p>หน้านี้ออกแบบสำหรับผู้ใช้ที่ไม่เคยใช้ SQL, Tableau หรือ Power BI มาก่อน ให้เริ่มจากปุ่มง่าย ๆ แล้วระบบจะพาไปดูผลลัพธ์ที่เหมาะสม</p>
+          </div>
+          <div class="button-row">
+            <button id="btnGuideSample" class="primary">ลองด้วยข้อมูลตัวอย่าง</button>
+            <button id="btnGuideDashboard">ไปหน้า Dashboard</button>
+            <button id="btnGuideBusiness">ไปหน้า Business Analytics</button>
+          </div>
+        </div>
+
+        <div class="quick-start-grid">
+          <div class="panel quick-card">
+            <div class="quick-icon">1</div>
+            <h3>มีไฟล์ CSV แล้ว</h3>
+            <p>อัปโหลดไฟล์ทางแถบซ้าย ระบบจะสร้างตารางและคำนวณคอลัมน์สำคัญให้อัตโนมัติถ้าพบ quantity, unit_price, discount และ cost</p>
+          </div>
+          <div class="panel quick-card">
+            <div class="quick-icon">2</div>
+            <h3>อยากดูภาพรวม</h3>
+            <p>เปิด Dashboard เพื่อดูยอดรวม กำไร แนวโน้มรายเดือน กลุ่มที่ขายดี และ Insight อัตโนมัติ โดยไม่ต้องเขียนสูตรเอง</p>
+          </div>
+          <div class="panel quick-card">
+            <div class="quick-icon">3</div>
+            <h3>อยากรู้ว่าควรทำอะไรต่อ</h3>
+            <p>เปิด Business Analytics เพื่อดูคำแนะนำ เช่น สินค้าใดควรโปรโมต ลูกค้ากลุ่มใดเสี่ยงหาย และส่วนใดควรปรับกำไร</p>
+          </div>
+        </div>
+
+        <div class="panel glossary-panel">
+          <h3>คำศัพท์ที่ระบบใช้บ่อย</h3>
+          <div class="glossary-grid">
+            <div><strong>Sales / Revenue</strong><p>ยอดขายหรือรายได้รวม</p></div>
+            <div><strong>Profit</strong><p>กำไรหลังหักต้นทุน</p></div>
+            <div><strong>Profit Margin</strong><p>กำไรคิดเป็นกี่เปอร์เซ็นต์ของยอดขาย</p></div>
+            <div><strong>AOV</strong><p>ยอดซื้อเฉลี่ยต่อคำสั่งซื้อ</p></div>
+            <div><strong>RFM</strong><p>วิธีดูว่าลูกค้าคนใดซื้อเร็ว ซื้อบ่อย และใช้จ่ายสูง</p></div>
+            <div><strong>Churn Risk</strong><p>ลูกค้าที่มีโอกาสหาย เพราะไม่ได้ซื้อซ้ำนาน</p></div>
+          </div>
+        </div>
+
+        <div class="panel friendly-note">
+          <h3>แนวทางใช้งานสำหรับมือใหม่</h3>
+          <ol>
+            <li>เริ่มจาก <strong>ลองด้วยข้อมูลตัวอย่าง</strong> เพื่อดูว่าระบบทำอะไรได้บ้าง</li>
+            <li>จากนั้นอัปโหลด CSV จริงของคุณ และเลือกคอลัมน์ให้ตรง เช่น ยอดขาย กำไร วันที่ ลูกค้า สินค้า</li>
+            <li>ใช้ Dashboard ก่อน แล้วค่อยใช้ SQL Editor เมื่ออยากเขียนคำถามเฉพาะทาง</li>
+            <li>ใช้ Tableau หรือ Power BI เป็นส่วนเสริมเมื่อต้องการทำ Dashboard ระดับองค์กร</li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="dashboard" class="tab-panel">
         <div class="panel hero-panel">
           <div>
-            <h2>Dashboard Builder</h2>
-            <p>เลือกตารางและคอลัมน์ ระบบจะคำนวณ KPI และสร้างกราฟจาก SQLite ใน Browser ให้ทันที</p>
+            <h2>Dashboard แบบกดเลือกได้</h2>
+            <p>เหมาะสำหรับผู้เริ่มต้น: เลือกตาราง เลือกคอลัมน์ แล้วระบบจะคำนวณ KPI และสร้างกราฟให้ทันที</p>
           </div>
-          <button id="btnRefreshDashboard">Refresh Dashboard</button>
+          <button id="btnRefreshDashboard">คำนวณ Dashboard ใหม่</button>
         </div>
 
         <div class="controls-grid panel">
           <label>ตาราง <select id="dashTable"></select></label>
-          <label>Metric หลัก เช่น sales/revenue <select id="metricColumn"></select></label>
-          <label>Profit <select id="profitColumn"></select></label>
+          <label>ยอดขาย/รายได้ <select id="metricColumn"></select></label>
+          <label>กำไร <select id="profitColumn"></select></label>
           <label>วันที่ <select id="dateColumn"></select></label>
-          <label>กลุ่ม เช่น category/region <select id="categoryColumn"></select></label>
+          <label>กลุ่มข้อมูล เช่น สินค้า/พื้นที่/ช่องทาง <select id="categoryColumn"></select></label>
           <label>ลูกค้า <select id="customerColumn"></select></label>
         </div>
 
@@ -129,8 +198,8 @@
       <section id="business" class="tab-panel">
         <div class="panel hero-panel">
           <div>
-            <h2>Business Analytics Assistant</h2>
-            <p>วิเคราะห์ข้อมูลเชิงธุรกิจจากตารางที่เลือก พร้อม KPI, Growth, Customer, Product Matrix, RFM/Churn และข้อเสนอแนะเชิงปฏิบัติ</p>
+            <h2>ผู้ช่วยวิเคราะห์ธุรกิจ</h2>
+            <p>เหมาะสำหรับตอบคำถามว่า “ข้อมูลชุดนี้บอกอะไร และควรทำอะไรต่อ” พร้อม KPI, Growth, ลูกค้า, สินค้า, RFM/Churn และคำแนะนำเชิงปฏิบัติ</p>
           </div>
           <button id="btnRefreshBusiness" class="primary">วิเคราะห์ธุรกิจ</button>
         </div>
@@ -190,8 +259,8 @@
       <section id="quality" class="tab-panel">
         <div class="panel hero-panel">
           <div>
-            <h2>Data Quality Check</h2>
-            <p>ตรวจ Missing Value, Duplicate, ชนิดข้อมูล และค่าพื้นฐาน เพื่อเตรียมข้อมูลก่อนทำ Dashboard หรือ Tableau</p>
+            <h2>ตรวจคุณภาพข้อมูล</h2>
+            <p>ตรวจค่าว่าง ข้อมูลซ้ำ ชนิดข้อมูล และตัวอย่างข้อมูล เพื่อช่วยให้ผู้ใช้มือใหม่รู้ว่าข้อมูลพร้อมวิเคราะห์หรือยัง</p>
           </div>
           <button id="btnRunQuality">Run Quality Check</button>
         </div>
@@ -210,22 +279,84 @@
         </div>
       </section>
 
+
+
+      <section id="records" class="tab-panel">
+        <div class="panel hero-panel">
+          <div>
+            <h2>ข้อมูลอ้างอิงและแก้ไขข้อมูล</h2>
+            <p>หน้านี้ช่วยให้ผู้ใช้มือใหม่ดูได้ว่า <strong>customer_id คือใคร</strong>, <strong>product_id คือสินค้าอะไร</strong> และแก้ไขข้อมูลผิดหรือทำเครื่องหมาย “ไม่นำมาคำนวณ” ได้โดยไม่ต้องเขียน SQL</p>
+          </div>
+          <div class="button-row">
+            <button id="btnBuildReferenceTables" class="primary">สร้างตารางอ้างอิงลูกค้า/สินค้า</button>
+            <button id="btnRefreshRecords">โหลดข้อมูลใหม่</button>
+          </div>
+        </div>
+
+        <div class="controls-grid panel">
+          <label>ตารางข้อมูลหลัก <select id="recordSourceTable"></select></label>
+          <label>ค้นหา ID / ชื่อ / สินค้า / จังหวัด <input id="recordSearch" type="search" placeholder="เช่น C001, Anan, P001, Food" /></label>
+          <label>จำนวนแถวตรวจปัญหา <select id="recordLimit"><option>50</option><option selected>100</option><option>250</option><option>500</option></select></label>
+        </div>
+
+        <div class="metrics" id="recordCards"></div>
+
+        <div class="chart-grid">
+          <div class="panel">
+            <div class="section-head"><h3>Customer Reference</h3><span class="badge">ดูว่า customer_id คือใคร</span></div>
+            <p class="small">สรุปลูกค้าจากตารางหลัก เช่น ชื่อลูกค้า จังหวัด จำนวนออเดอร์ ยอดซื้อ และวันที่ซื้อล่าสุด</p>
+            <div id="customerReferenceTable" class="table-wrap"></div>
+          </div>
+          <div class="panel">
+            <div class="section-head"><h3>Product Reference</h3><span class="badge">ดูว่า product_id คือสินค้าอะไร</span></div>
+            <p class="small">สรุปสินค้า/หมวดสินค้า พร้อมยอดขาย กำไร และ Profit Margin เพื่อช่วยตรวจข้อมูลสินค้า</p>
+            <div id="productReferenceTable" class="table-wrap"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="section-head"><h3>Data Review Queue</h3><span class="badge">แก้ข้อมูลผิด / Exclude แถว</span></div>
+          <p class="small">ระบบจะแสดงแถวที่มีค่าว่างในคอลัมน์สำคัญ หรือแถวที่ถูกทำเครื่องหมายไม่นำไปคำนวณ สามารถกด “แก้ไข” เพื่อปรับข้อมูลได้</p>
+          <div id="recordIssueTable" class="table-wrap"></div>
+        </div>
+
+        <div class="panel edit-panel">
+          <div class="section-head"><h3>แก้ไขแถวข้อมูล</h3><span id="editRowBadge" class="badge">ยังไม่ได้เลือกแถว</span></div>
+          <p class="small">เลือกแถวจาก Data Review หรือ Table Browser แล้วแก้ไขค่าที่ผิด หากข้อมูลแถวนั้นยังไม่ควรใช้วิเคราะห์ ให้ติ๊ก “ไม่นำแถวนี้ไปคำนวณ”</p>
+          <div class="controls-grid">
+            <label>ตาราง <input id="editTableName" type="text" readonly placeholder="เลือกแถวก่อน" /></label>
+            <label>rowid <input id="editRowId" type="text" readonly placeholder="เลือกแถวก่อน" /></label>
+            <label class="form-check edit-check"><input id="editExcludeFlag" type="checkbox" /><span>ไม่นำแถวนี้ไปคำนวณ Dashboard / Business Analytics</span></label>
+          </div>
+          <label>เหตุผลที่ไม่ใช้แถวนี้ หรือหมายเหตุการแก้ไข
+            <input id="editExcludeReason" type="text" placeholder="เช่น customer_id ว่าง, ราคาผิด, รอตรวจสอบ" />
+          </label>
+          <div id="editForm" class="edit-form-grid"></div>
+          <div class="button-row">
+            <button id="btnSaveRowEdit" class="primary">บันทึกการแก้ไข</button>
+            <button id="btnExcludeRow">ทำเครื่องหมายไม่นำมาคำนวณ</button>
+            <button id="btnIncludeRow">นำกลับมาคำนวณ</button>
+          </div>
+          <p id="editMessage" class="status"></p>
+        </div>
+      </section>
+
       <section id="sql" class="tab-panel">
         <div class="panel">
           <div class="section-head">
             <div>
-              <h2>SQL Editor</h2>
-              <p>ใช้ SQLite syntax ในหน้าเว็บนี้ ถ้าจะใช้ MySQL ให้ดูแท็บ MySQL</p>
+              <h2>SQL Editor สำหรับผู้ที่อยากวิเคราะห์ลึกขึ้น</h2>
+              <p>ไม่จำเป็นต้องใช้หน้านี้ก็วิเคราะห์ได้ แต่ถ้าต้องการถามข้อมูลเฉพาะเจาะจง ให้เริ่มจากปุ่มตัวอย่างด้านล่างก่อน</p>
             </div>
             <div class="button-row"><button id="btnRunSql" class="primary">Run SQL</button><button id="btnExportSqlCsv">Export Result CSV</button></div>
           </div>
-          <label>SQL Query</label>
+          <label>เขียนคำสั่ง SQL หรือกดปุ่มตัวอย่างด้านล่าง</label>
           <textarea id="sqlInput" spellcheck="false">SELECT * FROM sales_data LIMIT 20;</textarea>
           <div class="button-row template-row">
-            <button class="sql-template" data-sql="SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;">List Tables</button>
-            <button class="sql-template" data-sql="SELECT category, SUM(net_sales) AS total_sales FROM sales_data GROUP BY category ORDER BY total_sales DESC;">Sales by Category</button>
-            <button class="sql-template" data-sql="SELECT substr(order_date, 1, 7) AS month, SUM(net_sales) AS total_sales FROM sales_data GROUP BY substr(order_date, 1, 7) ORDER BY month;">Monthly Trend</button>
-            <button class="sql-template" data-sql="SELECT customer_id, customer_name, SUM(net_sales) AS total_sales FROM sales_data GROUP BY customer_id, customer_name ORDER BY total_sales DESC LIMIT 10;">Top Customers</button>
+            <button class="sql-template" data-sql="SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;">ดูรายชื่อตาราง</button>
+            <button class="sql-template" data-sql="SELECT category, SUM(net_sales) AS total_sales FROM sales_data GROUP BY category ORDER BY total_sales DESC;">ยอดขายตามหมวด</button>
+            <button class="sql-template" data-sql="SELECT substr(order_date, 1, 7) AS month, SUM(net_sales) AS total_sales FROM sales_data GROUP BY substr(order_date, 1, 7) ORDER BY month;">ยอดขายรายเดือน</button>
+            <button class="sql-template" data-sql="SELECT customer_id, customer_name, SUM(net_sales) AS total_sales FROM sales_data GROUP BY customer_id, customer_name ORDER BY total_sales DESC LIMIT 10;">ลูกค้าซื้อสูงสุด</button>
           </div>
           <p id="sqlMessage" class="status"></p>
         </div>
@@ -242,8 +373,8 @@
       <section id="browser" class="tab-panel">
         <div class="panel hero-panel">
           <div>
-            <h2>Table Browser</h2>
-            <p>ดูข้อมูล แบ่งหน้า ค้นหา และ Export ตารางเป็น CSV</p>
+            <h2>ดูข้อมูลในตาราง</h2>
+            <p>ดูข้อมูลจริง ค้นหา และดาวน์โหลดเป็น CSV เหมือนดู spreadsheet เบื้องต้น</p>
           </div>
           <button id="btnExportTableCsv">Export Table CSV</button>
         </div>
@@ -259,7 +390,7 @@
         <div class="panel hero-panel">
           <div>
             <h2>MySQL Helper</h2>
-            <p>สร้าง Query สำหรับ MySQL Workbench และเชื่อม Backend API ถ้าต้องการดึงข้อมูล MySQL จริง</p>
+            <p>สำหรับผู้ใช้ระดับต่อไป: สร้าง Query สำหรับ MySQL Workbench และเชื่อม Backend API ถ้าต้องการดึงข้อมูล MySQL จริง</p>
           </div>
           <button id="btnGenerateMysql">Generate MySQL SQL</button>
         </div>
@@ -374,7 +505,7 @@ in
         <div class="panel guide">
           <h2>คู่มือเร็ว</h2>
           <ol>
-            <li>กด <strong>สร้างข้อมูลตัวอย่าง</strong> หรือ Import CSV</li>
+            <li>เริ่มที่แท็บ <strong>เริ่มต้น</strong> แล้วกดลองด้วยข้อมูลตัวอย่าง หรืออัปโหลด CSV</li>
             <li>เลือกตารางและคอลัมน์ใน Dashboard</li>
             <li>เปิด Business Analytics เพื่อดูข้อเสนอแนะเชิงธุรกิจจากข้อมูล</li>
             <li>ตรวจ Data Quality เพื่อลด Missing/Duplicate</li>
