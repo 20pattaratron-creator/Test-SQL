@@ -1,88 +1,113 @@
-# Data Analytics Studio
+# Data Analytics Studio — Blue Theme + SPSS-style Verified Statistics
 
-เว็บแอปแบบ Static (HTML + CSS + JavaScript) สำหรับจัดการ SQLite, วิเคราะห์ข้อมูลแบบ SPSS-style และสร้างกราฟ/Dashboard ใน Browser
+เว็บแอปสำหรับ **SQLite + Data Analytics + SPSS-style Statistics + Charts + Dashboard** ทำงานใน Browser พร้อม Light/Dark Mode และคำอธิบายสองภาษา (ไทย/English)
 
-## ความสามารถใน Prototype
+Browser-based **SQLite + Data Analytics + SPSS-style Statistics + Charts + Dashboard** workspace with Light/Dark Mode and bilingual Thai/English explanations.
 
-- เปิด/สร้าง/บันทึก SQLite (`.db`, `.sqlite`, `.sqlite3`)
-- Import CSV / Excel (`.xlsx`, `.xls`) เป็น SQLite table
-- Import SPSS `.sav` แบบ Experimental ผ่าน `jsavvy` CDN
-- Data View และ Variable View แบบใกล้เคียงแนวคิด SPSS
-- SQL Editor และ Query Result
-- SPSS Mode
-  - Descriptive Statistics
-  - Frequencies
-  - Crosstabs
-  - Pearson Correlation
-  - Simple Linear Regression
-- Chart Builder: Bar, Line, Pie, Scatter
-- Dashboard ที่บันทึกกราฟจาก Chart Builder
-- Dark / Light Theme
-- Export CSV และ SQLite
-- Sample sales dataset ในตัว
+## Highlights / จุดเด่น
 
-## วิธีเปิด
+- Blue UI theme with Light / Dark Mode
+- SQLite Manager and SQL Editor
+- Import CSV / Excel / SQLite and experimental SPSS `.sav`
+- Data View preview 500 rows for UI performance
+- **Statistical analyses use the complete current table** (not a silent 5,000-row sample)
+- Variable View and Data Profile
+- SPSS-style statistical output with bilingual explanations
+- Formula/source links inside the UI
+- Chart Builder and Dashboard
+- Guide / คู่มือ explaining each statistical method and each Business Analyst tool
 
-เนื่องจากมี WebAssembly / ES Module แนะนำให้เปิดผ่าน Local Web Server แทนการดับเบิลคลิก `index.html`
+## Statistical Methods / วิธีวิเคราะห์สถิติ
 
-### วิธีที่ 1: Python
+1. Descriptive Statistics / สถิติเชิงพรรณนา
+2. Frequencies / ตารางแจกแจงความถี่
+3. Crosstabs / ตารางไขว้
+4. Pearson Correlation / สหสัมพันธ์เพียร์สัน
+5. Simple Linear Regression / การถดถอยเชิงเส้นอย่างง่าย
+6. Independent-Samples t Test / t-test สองกลุ่มอิสระ
+7. Paired-Samples t Test / t-test แบบจับคู่
+8. Chi-Square Test of Independence / ไคสแควร์ทดสอบความเป็นอิสระ
+9. One-Way ANOVA / ANOVA ทางเดียว
+
+Core formulas are implemented in `statistics.js` and documented in [`FORMULA_REFERENCES.md`](FORMULA_REFERENCES.md). Primary formula references use the NIST/SEMATECH statistical handbook / NIST Dataplot documentation, with official IBM SPSS documentation used for SPSS workflow context.
+
+## Accuracy Improvements / การปรับปรุงความถูกต้อง
+
+- Sample variance and sample standard deviation use denominator `n − 1`.
+- Adjusted Fisher–Pearson skewness is used.
+- Statistical procedures use explicit missing-value handling.
+- Correlation/regression/t-test pairwise procedures use complete numeric pairs only.
+- Pearson correlation includes two-sided significance testing.
+- Regression reports OLS model summary, ANOVA, coefficient SE, t, p, and 95% CI.
+- Independent t test reports both Welch and pooled equal-variance versions.
+- Paired t test analyzes within-pair differences.
+- Chi-square computes expected counts from marginal totals and flags sparse expected counts.
+- One-way ANOVA reports between/within sums of squares, mean squares, F, p and supplementary effect sizes.
+- Frequencies are sorted naturally so cumulative percent follows the displayed value order.
+- Crosstab totals are based on the same complete-pair cases as table cells.
+
+## Business Analyst Guide / คู่มือ Business Analyst
+
+The built-in Guide explains the purpose of:
+
+- Excel
+- SQL / SQLite
+- R / RStudio
+- SPSS-style Statistics
+- Power Query
+- Power BI
+- Tableau
+- Business Problem Solving
+
+Each item includes Thai and English descriptions plus official reference links where applicable.
+
+## Run / วิธีเปิด
+
+Because the app loads WebAssembly and ES modules, run it through a local web server rather than double-clicking `index.html`.
 
 ```bash
 cd data-analytics-studio
 python -m http.server 8080
 ```
 
-จากนั้นเปิด `http://localhost:8080`
+Open:
 
-### วิธีที่ 2: VS Code
+```text
+http://localhost:8080
+```
 
-ติดตั้ง Live Server แล้วเลือก **Open with Live Server** ที่ `index.html`
+## Formula Validation Test / ชุดทดสอบสูตร
 
-## Dependencies (โหลดผ่าน CDN)
+If Node.js is installed:
 
-- sql.js — SQLite in the browser
-- SheetJS — CSV / Excel import
-- Chart.js — Charts
-- jsavvy — Experimental SPSS `.sav` reader
+```bash
+node statistics.test.mjs
+```
 
-ดังนั้นการเปิดครั้งแรกต้องมีอินเทอร์เน็ต หากต้องการทำเป็น Offline 100% ให้ดาวน์โหลด dependency มาไว้ใน `vendor/` และแก้ URL ใน `index.html` / `app.js`
+Expected:
 
-## หมายเหตุ SPSS
+```text
+All statistical core tests passed.
+```
 
-`SPSS Mode` ในโปรเจกต์นี้หมายถึง UI/Workflow และชุดการวิเคราะห์สถิติที่คล้ายการใช้งาน SPSS ไม่ใช่ IBM SPSS Statistics และไม่ได้ใช้โค้ดของ IBM SPSS
-
-การอ่าน `.sav` ใช้ parser โอเพนซอร์สที่ยังอยู่ระหว่างการพัฒนา จึงอาจไม่รองรับ `.sav` บางชนิด โดยเฉพาะรูปแบบ compression/encoding/metadata บางแบบ หากอ่านไม่สำเร็จให้ Export จาก SPSS/PSPP เป็น CSV หรือ Excel ก่อน
-
-## โครงสร้าง
+## Files / โครงสร้างไฟล์
 
 ```text
 data-analytics-studio/
 ├── index.html
 ├── styles.css
 ├── app.js
-└── README.md
+├── statistics.js
+├── statistics.test.mjs
+├── FORMULA_REFERENCES.md
+├── README.md
+└── THIRD_PARTY_NOTICES.md
 ```
 
-## แนวทางต่อยอด
+## Important Statistical Limitation / ข้อจำกัดสำคัญ
 
-- IndexedDB autosave workspace
-- Query history / Saved query
-- Editable Data View
-- Value Labels / Missing Values / Measure settings
-- Chi-square, t-test, ANOVA, non-parametric tests
-- Multiple regression / Logistic regression
-- Pivot table builder
-- Dashboard filters / slicers
-- Export dashboard เป็น PDF/PNG
-- PWA และ Offline mode
-- Web Worker สำหรับ dataset ขนาดใหญ่
+This project is a custom browser analytics application with an SPSS-style workflow; **it is not IBM SPSS Statistics**. Statistical correctness is not only a matter of formulas. Method selection depends on study design, measurement level, independence, distributional/model assumptions, missing-data mechanism, and data quality.
 
+โปรแกรมนี้เป็นเว็บแอปที่พัฒนาขึ้นเองและใช้ workflow แบบ SPSS แต่ **ไม่ใช่ IBM SPSS Statistics** ความถูกต้องไม่ได้ขึ้นกับสูตรเพียงอย่างเดียว แต่ยังขึ้นกับการออกแบบการศึกษา ระดับการวัด ความเป็นอิสระ สมมติฐานของโมเดล ลักษณะข้อมูลสูญหาย และคุณภาพข้อมูล
 
-## Blue Light / Dark Theme
-
-- UI ใหม่ใช้ Blue Design System ทั้งระบบ
-- Light Mode: พื้นขาว/ฟ้าอ่อน พร้อม Sidebar สีน้ำเงินเข้ม
-- Dark Mode: Navy / Deep Blue ลดแสงจ้าและยังคง contrast ของข้อมูล
-- ปุ่มสลับ Light / Dark อยู่ด้านขวาบน
-- ระบบจำธีมล่าสุดด้วย localStorage
-- หากยังไม่เคยเลือก จะอิง theme preference ของระบบปฏิบัติการ
+For high-stakes decisions, regulated work, or publication, independently validate results in a recognized statistical package and have the analysis reviewed by an appropriate domain/statistics expert.

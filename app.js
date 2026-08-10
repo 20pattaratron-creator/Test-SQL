@@ -1,3 +1,9 @@
+import {
+  mean, median, sampleVariance as variance, sampleStdDev as stdev, standardError,
+  adjustedFisherPearsonSkewness as skewness, correlationTest, simpleLinearRegression,
+  independentTTest, pairedTTest, chiSquareIndependence, oneWayAnova, studentTInv
+} from './statistics.js';
+
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
@@ -12,14 +18,97 @@ const state = {
   chart: null,
   dashboardCharts: [],
   activeAnalysis: 'descriptives',
+  totalRows: 0,
 };
 
 const analysisNames = {
-  descriptives: 'Descriptive Statistics',
-  frequencies: 'Frequencies',
-  crosstabs: 'Crosstabs',
-  correlation: 'Correlations',
-  regression: 'Linear Regression',
+  descriptives: 'Descriptive Statistics / สถิติเชิงพรรณนา',
+  frequencies: 'Frequencies / ตารางแจกแจงความถี่',
+  crosstabs: 'Crosstabs / ตารางไขว้',
+  correlation: 'Pearson Correlation / สหสัมพันธ์เพียร์สัน',
+  regression: 'Simple Linear Regression / การถดถอยเชิงเส้นอย่างง่าย',
+  independentT: 'Independent-Samples t Test / t-test สองกลุ่มอิสระ',
+  pairedT: 'Paired-Samples t Test / t-test แบบจับคู่',
+  chiSquare: 'Chi-Square Independence / ไคสแควร์ทดสอบความเป็นอิสระ',
+  anova: 'One-Way ANOVA / การวิเคราะห์ความแปรปรวนทางเดียว',
+};
+
+const METHOD_SOURCES = {
+  nistScale: 'https://www.itl.nist.gov/div898/handbook/eda/section3/eda356.htm',
+  nistSkew: 'https://www.itl.nist.gov/div898/handbook/eda/section3/eda35b.htm',
+  nistTwoT: 'https://www.itl.nist.gov/div898/handbook/eda/section3/eda353.htm',
+  nistPairedT: 'https://www.itl.nist.gov/div898/handbook/prc/section3/prc311.htm',
+  nistChi: 'https://www.itl.nist.gov/div898/handbook/prc/section4/prc45.htm',
+  nistAnova: 'https://www.itl.nist.gov/div898/handbook/ppc/section2/ppc231.htm',
+  nistRegression: 'https://www.itl.nist.gov/div898/handbook/pmd/section1/pmd141.htm',
+  nistCorrelation: 'https://www.itl.nist.gov/div898/software/dataplot/refman2/auxillar/correlat.htm',
+  ibmCorrelation: 'https://www.ibm.com/docs/en/spss-statistics/32.0.0?topic=features-bivariate-correlations',
+  ibmTTest: 'https://www.ibm.com/docs/en/spss-statistics/32.0.0?topic=tests-independent-samples-t-test',
+  ibmAnova: 'https://www.ibm.com/docs/en/spss-statistics/32.0.0?topic=features-one-way-anova',
+  ibmSpss: 'https://www.ibm.com/docs/en/spss-statistics/32.0.0?topic=spss-statistics-32-documentation',
+  excel: 'https://support.microsoft.com/en-us/excel/',
+  powerQuery: 'https://learn.microsoft.com/en-us/power-query/power-query-what-is-power-query',
+  powerBi: 'https://learn.microsoft.com/th-th/power-bi/fundamentals/power-bi-overview',
+  tableau: 'https://help.tableau.com/current/guides/get-started-tutorial/en-us/get-started-tutorial-home.htm',
+  rProject: 'https://www.r-project.org/about.html',
+  sqlite: 'https://sqlite.org/lang_select.html',
+};
+
+const analysisInfo = {
+  descriptives: {
+    th: 'สรุปลักษณะของตัวแปรเชิงปริมาณ เช่น ค่าเฉลี่ย มัธยฐาน ส่วนเบี่ยงเบนมาตรฐาน ความแปรปรวน ค่าต่ำสุด ค่าสูงสุด และความเบ้ เพื่อเข้าใจศูนย์กลาง การกระจาย และรูปร่างของข้อมูล',
+    en: 'Summarizes a quantitative variable using center, spread, range, and shape statistics such as mean, median, sample standard deviation, variance, minimum, maximum, and adjusted skewness.',
+    formula: 's² = Σ(xᵢ − x̄)² / (n − 1);  s = √s²;  SE = s/√n',
+    refs: [['NIST: Measures of Scale', METHOD_SOURCES.nistScale], ['NIST: Skewness', METHOD_SOURCES.nistSkew]],
+  },
+  frequencies: {
+    th: 'นับจำนวนและร้อยละของแต่ละค่า เหมาะกับตัวแปรเชิงกลุ่ม/อันดับ และใช้ตรวจค่าที่ผิดปกติหรือข้อมูลสูญหาย',
+    en: 'Counts each observed value and reports Percent, Valid Percent, and Cumulative Percent; useful for categorical/ordinal variables and data-quality checks.',
+    formula: 'Percent = frequency / all cases × 100; Valid Percent = frequency / nonmissing cases × 100',
+    refs: [['IBM SPSS Statistics', METHOD_SOURCES.ibmSpss]],
+  },
+  crosstabs: {
+    th: 'สร้างตารางไขว้ระหว่างตัวแปรเชิงกลุ่มสองตัวเพื่อดูรูปแบบการกระจายร่วมกัน โดยตัดกรณีที่ขาดข้อมูลในตัวแปรใดตัวแปรหนึ่งออกแบบ pairwise',
+    en: 'Builds a two-way contingency table for two categorical variables using complete pairs, making joint category patterns easier to inspect.',
+    formula: 'Cell Count = number of complete cases in row category i and column category j',
+    refs: [['NIST: Contingency Tables', METHOD_SOURCES.nistChi]],
+  },
+  correlation: {
+    th: 'วัดความแรงและทิศทางของความสัมพันธ์เชิงเส้นระหว่างตัวแปรเชิงปริมาณสองตัว ค่า r อยู่ระหว่าง −1 ถึง +1 และใช้ complete pairs เท่านั้น',
+    en: 'Measures the strength and direction of a linear relationship between two quantitative variables. Pearson r ranges from −1 to +1 and uses complete pairs only.',
+    formula: 'r = Σ[(xᵢ−x̄)(yᵢ−ȳ)] / √(Σ(xᵢ−x̄)² Σ(yᵢ−ȳ)²)',
+    refs: [['IBM: Bivariate Correlations', METHOD_SOURCES.ibmCorrelation], ['NIST: Pearson Correlation Formula', METHOD_SOURCES.nistCorrelation]],
+  },
+  regression: {
+    th: 'ประมาณสมการเส้นตรง ŷ = b₀ + b₁x ด้วยวิธีกำลังสองน้อยที่สุด พร้อม R², Adjusted R², ANOVA F-test, ค่าสัมประสิทธิ์, Standard Error, t-test, p-value และช่วงความเชื่อมั่น 95%',
+    en: 'Fits ŷ = b₀ + b₁x by ordinary least squares and reports model fit, ANOVA, coefficient standard errors, t tests, p-values, and 95% confidence intervals.',
+    formula: 'b₁ = Σ(xᵢ−x̄)(yᵢ−ȳ) / Σ(xᵢ−x̄)²;  b₀ = ȳ − b₁x̄',
+    refs: [['NIST: Linear Least Squares', METHOD_SOURCES.nistRegression]],
+  },
+  independentT: {
+    th: 'เปรียบเทียบค่าเฉลี่ยของสองกลุ่มที่เป็นอิสระต่อกัน โปรแกรมรายงานทั้ง Welch t-test (ไม่สมมติความแปรปรวนเท่ากัน) และ pooled t-test (สมมติความแปรปรวนเท่ากัน)',
+    en: 'Compares means of two independent groups and reports both Welch’s unequal-variance t test and the pooled equal-variance t test.',
+    formula: 'Welch: t = (x̄₁−x̄₂) / √(s₁²/n₁ + s₂²/n₂), with Welch–Satterthwaite df',
+    refs: [['NIST: Two-Sample t Test', METHOD_SOURCES.nistTwoT], ['IBM: Independent-Samples T Test', METHOD_SOURCES.ibmTTest]],
+  },
+  pairedT: {
+    th: 'เปรียบเทียบค่าเฉลี่ยของข้อมูลสองชุดที่จับคู่กัน เช่น ก่อน–หลัง โดยคำนวณผลต่างภายในคู่ก่อนแล้วทดสอบว่าค่าเฉลี่ยของผลต่างเท่ากับศูนย์หรือไม่',
+    en: 'Compares paired measurements such as before/after data by testing whether the mean within-pair difference is zero.',
+    formula: 'dᵢ = xᵢ−yᵢ;  t = d̄ / (s_d/√n);  df = n−1',
+    refs: [['NIST: Paired Observations', METHOD_SOURCES.nistPairedT]],
+  },
+  chiSquare: {
+    th: 'ทดสอบว่าตัวแปรเชิงกลุ่มสองตัวเป็นอิสระต่อกันหรือไม่จากตารางไขว้ พร้อม Expected Count และ Cramér’s V สำหรับขนาดความสัมพันธ์',
+    en: 'Tests whether two categorical variables are independent using observed versus expected cell counts and reports Cramér’s V as an association effect size.',
+    formula: 'Eᵢⱼ = rowᵢ×columnⱼ / n;  χ² = Σ(Oᵢⱼ−Eᵢⱼ)²/Eᵢⱼ;  df=(r−1)(c−1)',
+    refs: [['NIST: Chi-Square Independence', METHOD_SOURCES.nistChi]],
+  },
+  anova: {
+    th: 'เปรียบเทียบค่าเฉลี่ยของตั้งแต่สองกลุ่มขึ้นไปด้วยอัตราส่วนความแปรปรวนระหว่างกลุ่มต่อความแปรปรวนภายในกลุ่ม พร้อม Eta-squared และ Omega-squared',
+    en: 'Compares means across two or more independent groups using the ratio of between-group to within-group variance and reports eta-squared and omega-squared effect sizes.',
+    formula: 'F = MS_between / MS_within;  df_between=k−1;  df_within=N−k',
+    refs: [['NIST: One-Way ANOVA', METHOD_SOURCES.nistAnova], ['IBM: One-Way ANOVA', METHOD_SOURCES.ibmAnova]],
+  },
 };
 
 function toast(message) {
@@ -89,6 +178,7 @@ function switchView(view) {
   $(`.nav-item[data-view="${view}"]`)?.classList.add('active');
   if (view === 'dashboard') renderDashboard();
   if (view === 'charts') populateChartSelectors();
+  if (view === 'guide') renderGuide();
 }
 
 function syncThemeButton() {
@@ -116,7 +206,7 @@ function createNewDatabase() {
   state.db?.close();
   state.db = new state.SQL.Database();
   state.fileName = 'new-database.sqlite';
-  state.currentTable = null; state.rows = []; state.columns = []; state.schema = [];
+  state.currentTable = null; state.rows = []; state.columns = []; state.schema = []; state.totalRows = 0;
   refreshDatabaseUI();
   toast('สร้างฐานข้อมูลใหม่แล้ว');
 }
@@ -263,7 +353,7 @@ async function refreshDatabaseUI(preferredTable = null) {
   $('#metricTables').textContent = tables.length;
   $('#fileNameLabel').textContent = state.fileName;
   if (state.currentTable) loadCurrentTable();
-  else { state.rows=[];state.columns=[];state.schema=[];renderAll(); }
+  else { state.rows=[];state.columns=[];state.schema=[];state.totalRows=0;renderAll(); }
 }
 
 function renderTableList() {
@@ -280,7 +370,12 @@ function loadCurrentTable() {
   if (!state.db || !state.currentTable) return;
   const info = state.db.exec(`PRAGMA table_info(${safeId(state.currentTable)})`)[0];
   state.schema = info ? info.values.map(v => ({ cid:v[0], name:v[1], type:v[2], notnull:v[3], default:v[4], pk:v[5] })) : [];
-  const res = state.db.exec(`SELECT * FROM ${safeId(state.currentTable)} LIMIT 5000`)[0];
+  const countResult = state.db.exec(`SELECT COUNT(*) AS n FROM ${safeId(state.currentTable)}`)[0];
+  state.totalRows = Number(countResult?.values?.[0]?.[0] ?? 0);
+
+  // Statistical procedures must use the complete table, not a silent preview sample.
+  // The Data View still renders only the first 500 rows for UI performance.
+  const res = state.db.exec(`SELECT * FROM ${safeId(state.currentTable)}`)[0];
   state.columns = res?.columns || state.schema.map(x=>x.name);
   state.rows = res?.values.map(vals => Object.fromEntries(state.columns.map((c,i)=>[c, vals[i]]))) || [];
   renderAll();
@@ -288,8 +383,10 @@ function loadCurrentTable() {
 
 function renderAll() {
   renderMetrics(); renderDataTable(); renderVariableView(); renderProfile(); renderAnalysisControls(); populateChartSelectors(); renderDashboard();
-  $('#dataSubtitle').textContent = state.currentTable ? `${state.currentTable} · แสดงสูงสุด 5,000 แถว` : 'แสดงข้อมูลแบบตาราง';
-  $('#statusStats').textContent = `${state.rows.length.toLocaleString()} rows · ${state.columns.length} columns`;
+  $('#dataSubtitle').textContent = state.currentTable
+    ? `${state.currentTable} · Preview 500 rows / แสดงตัวอย่าง 500 แถว · Analysis uses all ${state.totalRows.toLocaleString()} rows / วิเคราะห์จากข้อมูลทั้งหมด`
+    : 'แสดงข้อมูลแบบตาราง';
+  $('#statusStats').textContent = `${state.totalRows.toLocaleString()} rows · ${state.columns.length} columns`;
 }
 
 function dataProfile() {
@@ -302,10 +399,10 @@ function dataProfile() {
 
 function renderMetrics() {
   const p = dataProfile();
-  $('#metricRows').textContent = state.rows.length.toLocaleString();
+  $('#metricRows').textContent = state.totalRows.toLocaleString();
   $('#metricColumns').textContent = state.columns.length;
   $('#metricMissing').textContent = `${fmt(p.missingPct,1)}%`;
-  $('#dashRows').textContent = state.rows.length.toLocaleString(); $('#dashCols').textContent=state.columns.length; $('#dashNumeric').textContent=p.numeric; $('#dashMissing').textContent=`${fmt(p.missingPct,1)}%`;
+  $('#dashRows').textContent = state.totalRows.toLocaleString(); $('#dashCols').textContent=state.columns.length; $('#dashNumeric').textContent=p.numeric; $('#dashMissing').textContent=`${fmt(p.missingPct,1)}%`;
 }
 
 function renderDataTable() {
@@ -340,7 +437,11 @@ function renderProfile() {
   if (!state.currentTable) { el.className='profile-list empty-state'; el.textContent='เลือกหรือนำเข้าตารางเพื่อดู Profile'; return; }
   el.className='profile-list';
   el.innerHTML = [
-    ['Rows', state.rows.length.toLocaleString()], ['Columns',state.columns.length], ['Numeric variables',p.numeric], ['Missing cells',`${p.missing.toLocaleString()} (${fmt(p.missingPct,1)}%)`], ['Preview limit','5,000 rows']
+    ['Analysis rows / แถวที่ใช้วิเคราะห์', state.totalRows.toLocaleString()],
+    ['Columns / ตัวแปร',state.columns.length],
+    ['Numeric variables / ตัวแปรตัวเลข',p.numeric],
+    ['Missing cells / ค่าว่าง',`${p.missing.toLocaleString()} (${fmt(p.missingPct,1)}%)`],
+    ['Data preview / ตัวอย่างหน้า Data View','500 rows']
   ].map(([a,b])=>`<div class="profile-row"><span>${a}</span><strong>${b}</strong></div>`).join('');
 }
 
@@ -381,50 +482,385 @@ function renderQueryResults(results) {
   wrap.innerHTML = `<table class="data-table"><thead><tr>${r.columns.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${r.values.slice(0,1000).map(row=>`<tr>${row.map(v=>`<td>${escapeHtml(v ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
 
-function numericValues(col) { return state.rows.map(r=>r[col]).filter(v=>v!==null&&v!==''&&v!==undefined&&!Number.isNaN(Number(v))).map(Number); }
-function mean(a){return a.length?a.reduce((s,v)=>s+v,0)/a.length:NaN}
-function median(a){if(!a.length)return NaN;const b=[...a].sort((x,y)=>x-y),m=Math.floor(b.length/2);return b.length%2?b[m]:(b[m-1]+b[m])/2}
-function variance(a){if(a.length<2)return NaN;const m=mean(a);return a.reduce((s,v)=>s+(v-m)**2,0)/(a.length-1)}
-function stdev(a){return Math.sqrt(variance(a))}
-function pearson(x,y){const n=Math.min(x.length,y.length);if(n<2)return NaN;const mx=mean(x),my=mean(y);let num=0,dx=0,dy=0;for(let i=0;i<n;i++){const a=x[i]-mx,b=y[i]-my;num+=a*b;dx+=a*a;dy+=b*b}return num/Math.sqrt(dx*dy)}
-function skewness(a){const n=a.length;if(n<3)return NaN;const m=mean(a),sd=stdev(a);if(!sd)return 0;const sum=a.reduce((s,v)=>s+((v-m)/sd)**3,0);return n/((n-1)*(n-2))*sum}
-function linearRegression(x,y){const n=x.length,mx=mean(x),my=mean(y);let sxy=0,sxx=0;for(let i=0;i<n;i++){sxy+=(x[i]-mx)*(y[i]-my);sxx+=(x[i]-mx)**2}const slope=sxy/sxx,intercept=my-slope*mx;const pred=x.map(v=>intercept+slope*v);const ssRes=y.reduce((s,v,i)=>s+(v-pred[i])**2,0);const ssTot=y.reduce((s,v)=>s+(v-my)**2,0);return{slope,intercept,r2:1-ssRes/ssTot,n}}
+function isMissing(v) {
+  return v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
+}
 
-function optionList(cols=state.columns){ return cols.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join(''); }
+function numericValues(col) {
+  return state.rows
+    .map(r => r[col])
+    .filter(v => !isMissing(v) && Number.isFinite(Number(v)))
+    .map(Number);
+}
+
+function pairedNumeric(xc, yc) {
+  const pairs = [];
+  for (const row of state.rows) {
+    if (isMissing(row[xc]) || isMissing(row[yc])) continue;
+    const x = Number(row[xc]);
+    const y = Number(row[yc]);
+    if (Number.isFinite(x) && Number.isFinite(y)) pairs.push([x, y]);
+  }
+  return { x: pairs.map(p => p[0]), y: pairs.map(p => p[1]) };
+}
+
+function optionList(cols = state.columns, selected = null) {
+  return cols.map((c, i) => `<option value="${escapeHtml(c)}" ${(selected === c || (selected === null && i === 0)) ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+}
+
+function fmtP(p) {
+  if (!Number.isFinite(p)) return '—';
+  if (p < 0.001) return '&lt; .001';
+  return p.toFixed(3);
+}
+
+function decisionText(p, alpha = 0.05) {
+  if (!Number.isFinite(p)) return 'p-value is unavailable / ไม่สามารถคำนวณ p-value ได้';
+  return p < alpha
+    ? `Statistically significant at α = ${alpha} (reject H₀) / มีนัยสำคัญทางสถิติที่ระดับ α = ${alpha} (ปฏิเสธ H₀)`
+    : `Not statistically significant at α = ${alpha} (fail to reject H₀) / ยังไม่มีหลักฐานเพียงพอที่จะปฏิเสธ H₀ ที่ระดับ α = ${alpha}`;
+}
+
+function sourceLinks(refs = []) {
+  return refs.map(([label, url]) => `<a class="source-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)} ↗</a>`).join('');
+}
+
+function methodCardHtml(key) {
+  const info = analysisInfo[key];
+  if (!info) return '';
+  return `<div class="method-info">
+    <div class="method-info-head"><strong>${escapeHtml(analysisNames[key])}</strong><span>TH + EN</span></div>
+    <p><b>TH:</b> ${escapeHtml(info.th)}</p>
+    <p><b>EN:</b> ${escapeHtml(info.en)}</p>
+    <div class="formula-box"><span>Formula / สูตร</span><code>${escapeHtml(info.formula)}</code></div>
+    <div class="source-links">${sourceLinks(info.refs)}</div>
+  </div>`;
+}
+
+function uniqueValidValues(col) {
+  const map = new Map();
+  for (const row of state.rows) {
+    const v = row[col];
+    if (isMissing(v)) continue;
+    const key = String(v);
+    if (!map.has(key)) map.set(key, v);
+  }
+  return [...map.values()].sort(naturalCompare);
+}
+
+function naturalCompare(a, b) {
+  const na = Number(a), nb = Number(b);
+  const aNum = !isMissing(a) && Number.isFinite(na);
+  const bNum = !isMissing(b) && Number.isFinite(nb);
+  if (aNum && bNum) return na - nb;
+  return String(a).localeCompare(String(b), 'th', { numeric: true, sensitivity: 'base' });
+}
+
+function categoricalColumns(maxUnique = 50) {
+  return state.columns.filter(c => {
+    const n = uniqueValidValues(c).length;
+    return n >= 2 && n <= maxUnique;
+  });
+}
+
+function selectDifferentSecond(selectId, cols) {
+  const el = $(selectId);
+  if (el && cols.length > 1) el.selectedIndex = 1;
+}
+
 function renderAnalysisControls() {
   $('#analysisTitle').textContent = analysisNames[state.activeAnalysis];
   const box = $('#analysisControls');
-  if (!state.columns.length) { box.innerHTML='<div class="empty-state">นำเข้าข้อมูลก่อนเริ่มวิเคราะห์</div>'; return; }
-  const nums = state.columns.filter(c=>numericValues(c).length >= 2);
-  if (state.activeAnalysis === 'descriptives') box.innerHTML = `<label>Variable<select id="aVar">${optionList(nums)}</select></label>`;
-  if (state.activeAnalysis === 'frequencies') box.innerHTML = `<label>Variable<select id="aVar">${optionList()}</select></label>`;
-  if (state.activeAnalysis === 'crosstabs') box.innerHTML = `<label>Row Variable<select id="aRow">${optionList()}</select></label><label>Column Variable<select id="aCol">${optionList()}</select></label>`;
-  if (state.activeAnalysis === 'correlation') box.innerHTML = `<label>Variable X<select id="aX">${optionList(nums)}</select></label><label>Variable Y<select id="aY">${optionList(nums)}</select></label>`;
-  if (state.activeAnalysis === 'regression') box.innerHTML = `<label>Independent (X)<select id="aX">${optionList(nums)}</select></label><label>Dependent (Y)<select id="aY">${optionList(nums)}</select></label>`;
+  if (!state.columns.length) {
+    box.innerHTML = '<div class="empty-state">Import data before analysis / กรุณานำเข้าข้อมูลก่อนเริ่มวิเคราะห์</div>';
+    return;
+  }
+  const nums = state.columns.filter(c => numericValues(c).length >= 2);
+  const cats = categoricalColumns(50);
+  const intro = methodCardHtml(state.activeAnalysis);
+  let controls = '';
+
+  if (state.activeAnalysis === 'descriptives') {
+    controls = `<label>Variable / ตัวแปร<select id="aVar">${optionList(nums)}</select></label>`;
+  } else if (state.activeAnalysis === 'frequencies') {
+    controls = `<label>Variable / ตัวแปร<select id="aVar">${optionList()}</select></label>`;
+  } else if (state.activeAnalysis === 'crosstabs') {
+    const choices = cats.length ? cats : state.columns;
+    controls = `<label>Row Variable / ตัวแปรแถว<select id="aRow">${optionList(choices)}</select></label><label>Column Variable / ตัวแปรคอลัมน์<select id="aCol">${optionList(choices)}</select></label>`;
+  } else if (state.activeAnalysis === 'correlation') {
+    controls = `<label>Variable X / ตัวแปร X<select id="aX">${optionList(nums)}</select></label><label>Variable Y / ตัวแปร Y<select id="aY">${optionList(nums)}</select></label>`;
+  } else if (state.activeAnalysis === 'regression') {
+    controls = `<label>Independent X / ตัวแปรอิสระ<select id="aX">${optionList(nums)}</select></label><label>Dependent Y / ตัวแปรตาม<select id="aY">${optionList(nums)}</select></label>`;
+  } else if (state.activeAnalysis === 'independentT') {
+    const groups = cats.length ? cats : state.columns;
+    controls = `<label>Test Variable / ตัวแปรที่ทดสอบ<select id="aY">${optionList(nums)}</select></label><label>Grouping Variable / ตัวแปรแบ่งกลุ่ม<select id="aGroup">${optionList(groups)}</select></label><label>Group 1 / กลุ่ม 1<select id="aGroup1"></select></label><label>Group 2 / กลุ่ม 2<select id="aGroup2"></select></label>`;
+  } else if (state.activeAnalysis === 'pairedT') {
+    controls = `<label>Variable 1 / ตัวแปร 1<select id="aX">${optionList(nums)}</select></label><label>Variable 2 / ตัวแปร 2<select id="aY">${optionList(nums)}</select></label>`;
+  } else if (state.activeAnalysis === 'chiSquare') {
+    const choices = cats.length ? cats : state.columns;
+    controls = `<label>Row Variable / ตัวแปรแถว<select id="aRow">${optionList(choices)}</select></label><label>Column Variable / ตัวแปรคอลัมน์<select id="aCol">${optionList(choices)}</select></label>`;
+  } else if (state.activeAnalysis === 'anova') {
+    const groups = cats.length ? cats : state.columns;
+    controls = `<label>Dependent Variable / ตัวแปรตาม<select id="aY">${optionList(nums)}</select></label><label>Factor / ตัวแปรกลุ่ม<select id="aFactor">${optionList(groups)}</select></label>`;
+  }
+
+  box.innerHTML = intro + controls;
+  if (['correlation', 'regression', 'pairedT'].includes(state.activeAnalysis)) selectDifferentSecond('#aY', nums);
+  if (['crosstabs', 'chiSquare'].includes(state.activeAnalysis)) selectDifferentSecond('#aCol', cats.length ? cats : state.columns);
+  if (state.activeAnalysis === 'independentT') {
+    updateIndependentGroupSelectors();
+    $('#aGroup')?.addEventListener('change', updateIndependentGroupSelectors);
+  }
+}
+
+function updateIndependentGroupSelectors() {
+  const groupVar = $('#aGroup')?.value;
+  if (!groupVar) return;
+  const values = uniqueValidValues(groupVar);
+  const opts = values.map(v => `<option value="${escapeHtml(String(v))}">${escapeHtml(v)}</option>`).join('');
+  $('#aGroup1').innerHTML = opts;
+  $('#aGroup2').innerHTML = opts;
+  if (values.length > 1) $('#aGroup2').selectedIndex = 1;
 }
 
 function runAnalysis() {
-  if (!state.rows.length) return toast('ยังไม่มีข้อมูล');
+  if (!state.rows.length) return toast('ยังไม่มีข้อมูล / No data');
   try {
     let html = '';
     if (state.activeAnalysis === 'descriptives') html = outputDescriptives($('#aVar').value);
     if (state.activeAnalysis === 'frequencies') html = outputFrequencies($('#aVar').value);
-    if (state.activeAnalysis === 'crosstabs') html = outputCrosstab($('#aRow').value,$('#aCol').value);
-    if (state.activeAnalysis === 'correlation') html = outputCorrelation($('#aX').value,$('#aY').value);
-    if (state.activeAnalysis === 'regression') html = outputRegression($('#aX').value,$('#aY').value);
-    $('#analysisOutput').className='analysis-output'; $('#analysisOutput').innerHTML=html;
-  } catch (err) { toast(err.message); }
+    if (state.activeAnalysis === 'crosstabs') html = outputCrosstab($('#aRow').value, $('#aCol').value);
+    if (state.activeAnalysis === 'correlation') html = outputCorrelation($('#aX').value, $('#aY').value);
+    if (state.activeAnalysis === 'regression') html = outputRegression($('#aX').value, $('#aY').value);
+    if (state.activeAnalysis === 'independentT') html = outputIndependentT($('#aY').value, $('#aGroup').value, $('#aGroup1').value, $('#aGroup2').value);
+    if (state.activeAnalysis === 'pairedT') html = outputPairedT($('#aX').value, $('#aY').value);
+    if (state.activeAnalysis === 'chiSquare') html = outputChiSquare($('#aRow').value, $('#aCol').value);
+    if (state.activeAnalysis === 'anova') html = outputAnova($('#aY').value, $('#aFactor').value);
+    $('#analysisOutput').className = 'analysis-output';
+    $('#analysisOutput').innerHTML = html;
+  } catch (err) {
+    console.error(err);
+    toast(err.message);
+  }
 }
 
-function outputDescriptives(c){const a=numericValues(c);if(!a.length)throw new Error('ตัวแปรนี้ไม่มีข้อมูลตัวเลข');const missing=state.rows.length-a.length;return `<div class="output-block"><h3>Descriptive Statistics</h3><div class="caption">Variable: ${escapeHtml(c)}</div><table class="spss-table"><thead><tr><th>Variable</th><th>N</th><th>Missing</th><th>Mean</th><th>Median</th><th>Std. Deviation</th><th>Variance</th><th>Minimum</th><th>Maximum</th><th>Skewness</th></tr></thead><tbody><tr><td>${escapeHtml(c)}</td><td>${a.length}</td><td>${missing}</td><td>${fmt(mean(a),3)}</td><td>${fmt(median(a),3)}</td><td>${fmt(stdev(a),3)}</td><td>${fmt(variance(a),3)}</td><td>${fmt(Math.min(...a),3)}</td><td>${fmt(Math.max(...a),3)}</td><td>${fmt(skewness(a),3)}</td></tr></tbody></table></div>`}
+function outputHeader(key, extra = '') {
+  return `<div class="output-method-note">${methodCardHtml(key)}${extra}</div>`;
+}
 
-function outputFrequencies(c){const vals=state.rows.map(r=>r[c]);const valid=vals.filter(v=>v!==null&&v!==undefined&&v!=='');const counts=new Map();valid.forEach(v=>counts.set(String(v),(counts.get(String(v))||0)+1));let cum=0;const rows=[...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,100).map(([v,n])=>{const pct=n/vals.length*100;const vp=n/valid.length*100;cum+=vp;return `<tr><td>${escapeHtml(v)}</td><td>${n}</td><td>${fmt(pct,1)}</td><td>${fmt(vp,1)}</td><td>${fmt(cum,1)}</td></tr>`}).join('');return `<div class="output-block"><h3>Frequencies</h3><div class="caption">${escapeHtml(c)} · Valid ${valid.length} · Missing ${vals.length-valid.length}</div><table class="spss-table"><thead><tr><th>Value</th><th>Frequency</th><th>Percent</th><th>Valid Percent</th><th>Cumulative Percent</th></tr></thead><tbody>${rows}</tbody></table></div>`}
+function outputDescriptives(c) {
+  const a = numericValues(c);
+  if (!a.length) throw new Error('ตัวแปรนี้ไม่มีข้อมูลตัวเลข / No numeric data');
+  const missing = state.rows.length - a.length;
+  const m = mean(a);
+  const med = median(a);
+  const sd = stdev(a);
+  const v = variance(a);
+  const se = standardError(a);
+  const sk = skewness(a);
+  let ciLow = NaN, ciHigh = NaN;
+  if (a.length >= 2 && Number.isFinite(se)) {
+    const tc = studentTInv(0.975, a.length - 1);
+    ciLow = m - tc * se;
+    ciHigh = m + tc * se;
+  }
+  return `${outputHeader('descriptives')}
+    <div class="output-block"><h3>Descriptive Statistics / สถิติเชิงพรรณนา</h3>
+    <div class="caption">Variable / ตัวแปร: ${escapeHtml(c)} · Sample formulas use n−1 where applicable / สูตรตัวอย่างใช้ตัวหาร n−1 เมื่อเกี่ยวข้อง</div>
+    <div class="data-table-wrap"><table class="spss-table"><thead><tr><th>Variable</th><th>N</th><th>Missing</th><th>Mean</th><th>Std. Error</th><th>95% CI Mean</th><th>Median</th><th>Std. Deviation</th><th>Variance</th><th>Minimum</th><th>Maximum</th><th>Adjusted Skewness</th></tr></thead><tbody><tr>
+      <td>${escapeHtml(c)}</td><td>${a.length}</td><td>${missing}</td><td>${fmt(m,4)}</td><td>${fmt(se,4)}</td><td>[${fmt(ciLow,4)}, ${fmt(ciHigh,4)}]</td><td>${fmt(med,4)}</td><td>${fmt(sd,4)}</td><td>${fmt(v,4)}</td><td>${fmt(Math.min(...a),4)}</td><td>${fmt(Math.max(...a),4)}</td><td>${fmt(sk,4)}</td>
+    </tr></tbody></table></div></div>`;
+}
 
-function outputCrosstab(r,c){const rv=[...new Set(state.rows.map(x=>x[r]).filter(v=>v!==null&&v!==''))].slice(0,30),cv=[...new Set(state.rows.map(x=>x[c]).filter(v=>v!==null&&v!==''))].slice(0,30);const body=rv.map(a=>{const subset=state.rows.filter(x=>String(x[r])===String(a));return `<tr><td>${escapeHtml(a)}</td>${cv.map(b=>`<td>${subset.filter(x=>String(x[c])===String(b)).length}</td>`).join('')}<td>${subset.length}</td></tr>`}).join('');return `<div class="output-block"><h3>Crosstabulation</h3><div class="caption">${escapeHtml(r)} × ${escapeHtml(c)} (สูงสุด 30 หมวดต่อแกน)</div><div class="data-table-wrap"><table class="spss-table"><thead><tr><th>${escapeHtml(r)}</th>${cv.map(v=>`<th>${escapeHtml(v)}</th>`).join('')}<th>Total</th></tr></thead><tbody>${body}</tbody></table></div></div>`}
+function outputFrequencies(c) {
+  const vals = state.rows.map(r => r[c]);
+  const valid = vals.filter(v => !isMissing(v));
+  const counts = new Map();
+  for (const v of valid) {
+    const key = String(v);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  let cumulative = 0;
+  const entries = [...counts.entries()].sort((a, b) => naturalCompare(a[0], b[0]));
+  const rows = entries.map(([value, n]) => {
+    const pct = vals.length ? n / vals.length * 100 : NaN;
+    const validPct = valid.length ? n / valid.length * 100 : NaN;
+    cumulative += Number.isFinite(validPct) ? validPct : 0;
+    return `<tr><td>${escapeHtml(value)}</td><td>${n}</td><td>${fmt(pct,2)}</td><td>${fmt(validPct,2)}</td><td>${fmt(Math.min(100, cumulative),2)}</td></tr>`;
+  }).join('');
+  return `${outputHeader('frequencies')}
+    <div class="output-block"><h3>Frequencies / ตารางแจกแจงความถี่</h3><div class="caption">${escapeHtml(c)} · Valid ${valid.length} · Missing ${vals.length - valid.length} · Values sorted naturally / เรียงค่าตามลำดับธรรมชาติ</div>
+    <div class="data-table-wrap"><table class="spss-table"><thead><tr><th>Value / ค่า</th><th>Frequency / ความถี่</th><th>Percent</th><th>Valid Percent</th><th>Cumulative Percent</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
 
-function pairedNumeric(xc,yc){const pairs=state.rows.map(r=>[Number(r[xc]),Number(r[yc])]).filter(([x,y])=>Number.isFinite(x)&&Number.isFinite(y));return {x:pairs.map(p=>p[0]),y:pairs.map(p=>p[1])}}
-function outputCorrelation(xc,yc){const {x,y}=pairedNumeric(xc,yc);if(x.length<2)throw new Error('ข้อมูลคู่ไม่เพียงพอ');const r=pearson(x,y);return `<div class="output-block"><h3>Correlations</h3><table class="spss-table"><thead><tr><th></th><th>${escapeHtml(xc)}</th><th>${escapeHtml(yc)}</th></tr></thead><tbody><tr><td>${escapeHtml(xc)} · Pearson Correlation</td><td>1.000</td><td>${fmt(r,4)}</td></tr><tr><td>${escapeHtml(yc)} · Pearson Correlation</td><td>${fmt(r,4)}</td><td>1.000</td></tr><tr><td>N</td><td>${x.length}</td><td>${x.length}</td></tr></tbody></table></div>`}
-function outputRegression(xc,yc){const {x,y}=pairedNumeric(xc,yc);if(x.length<3)throw new Error('ต้องมีข้อมูลคู่ตัวเลขอย่างน้อย 3 แถว');const m=linearRegression(x,y);return `<div class="output-block"><h3>Model Summary</h3><table class="spss-table"><thead><tr><th>Model</th><th>R</th><th>R Square</th><th>N</th></tr></thead><tbody><tr><td>1</td><td>${fmt(Math.sqrt(Math.max(0,m.r2)),4)}</td><td>${fmt(m.r2,4)}</td><td>${m.n}</td></tr></tbody></table></div><div class="output-block"><h3>Coefficients</h3><table class="spss-table"><thead><tr><th>Term</th><th>B</th></tr></thead><tbody><tr><td>(Constant)</td><td>${fmt(m.intercept,5)}</td></tr><tr><td>${escapeHtml(xc)}</td><td>${fmt(m.slope,5)}</td></tr></tbody></table><div class="caption">Equation: ${escapeHtml(yc)} = ${fmt(m.intercept,4)} + ${fmt(m.slope,4)} × ${escapeHtml(xc)}</div></div>`}
+function completeCategoricalPairs(rowCol, colCol, maxCategories = 30) {
+  const pairs = state.rows.filter(r => !isMissing(r[rowCol]) && !isMissing(r[colCol]));
+  const rowValues = [...new Set(pairs.map(r => String(r[rowCol])))].sort(naturalCompare);
+  const colValues = [...new Set(pairs.map(r => String(r[colCol])))].sort(naturalCompare);
+  if (rowValues.length < 1 || colValues.length < 1) throw new Error('ไม่มีข้อมูลคู่ที่สมบูรณ์ / No complete category pairs');
+  if (rowValues.length > maxCategories || colValues.length > maxCategories) {
+    throw new Error(`มีหมวดหมู่มากเกิน ${maxCategories} ค่า โปรดกรองข้อมูลก่อน / Too many categories; filter the data first.`);
+  }
+  return { pairs, rowValues, colValues };
+}
+
+function outputCrosstab(r, c) {
+  if (r === c) throw new Error('กรุณาเลือกตัวแปรสองตัวที่ต่างกัน / Choose two different variables');
+  const { pairs, rowValues, colValues } = completeCategoricalPairs(r, c);
+  const matrix = rowValues.map(rv => colValues.map(cv => pairs.filter(x => String(x[r]) === rv && String(x[c]) === cv).length));
+  const rowTotals = matrix.map(row => row.reduce((s, v) => s + v, 0));
+  const colTotals = colValues.map((_, j) => matrix.reduce((s, row) => s + row[j], 0));
+  const body = rowValues.map((rv, i) => `<tr><td>${escapeHtml(rv)}</td>${matrix[i].map(n => `<td>${n}</td>`).join('')}<td><b>${rowTotals[i]}</b></td></tr>`).join('');
+  const totalRow = `<tr class="total-row"><td><b>Total</b></td>${colTotals.map(n => `<td><b>${n}</b></td>`).join('')}<td><b>${pairs.length}</b></td></tr>`;
+  return `${outputHeader('crosstabs')}
+    <div class="output-block"><h3>Crosstabulation / ตารางไขว้</h3><div class="caption">${escapeHtml(r)} × ${escapeHtml(c)} · Complete pairs N = ${pairs.length} / ใช้เฉพาะกรณีที่ทั้งสองตัวแปรไม่สูญหาย</div>
+    <div class="data-table-wrap"><table class="spss-table"><thead><tr><th>${escapeHtml(r)}</th>${colValues.map(v => `<th>${escapeHtml(v)}</th>`).join('')}<th>Total</th></tr></thead><tbody>${body}${totalRow}</tbody></table></div></div>`;
+}
+
+function outputCorrelation(xc, yc) {
+  if (xc === yc) throw new Error('กรุณาเลือกตัวแปรสองตัวที่ต่างกัน / Choose two different variables');
+  const { x, y } = pairedNumeric(xc, yc);
+  if (x.length < 3) throw new Error('ต้องมีข้อมูลคู่ตัวเลขอย่างน้อย 3 คู่ / At least 3 complete numeric pairs are required');
+  const m = correlationTest(x, y);
+  return `${outputHeader('correlation')}
+    <div class="output-block"><h3>Correlations / สหสัมพันธ์</h3>
+    <table class="spss-table"><thead><tr><th></th><th>${escapeHtml(xc)}</th><th>${escapeHtml(yc)}</th></tr></thead><tbody>
+      <tr><td>${escapeHtml(xc)} · Pearson Correlation</td><td>1.0000</td><td>${fmt(m.r,4)}</td></tr>
+      <tr><td>Sig. (2-tailed) / p-value</td><td>—</td><td>${fmtP(m.p)}</td></tr>
+      <tr><td>${escapeHtml(yc)} · Pearson Correlation</td><td>${fmt(m.r,4)}</td><td>1.0000</td></tr>
+      <tr><td>Sig. (2-tailed) / p-value</td><td>${fmtP(m.p)}</td><td>—</td></tr>
+      <tr><td>N / จำนวนคู่สมบูรณ์</td><td>${m.n}</td><td>${m.n}</td></tr>
+    </tbody></table>
+    <div class="insight-box"><b>Inference / การอนุมาน:</b> t(${m.df}) = ${fmt(m.t,4)}, p ${fmtP(m.p)}. ${decisionText(m.p)}</div>
+    <div class="method-warning">Correlation describes linear association, not causation / สหสัมพันธ์บอกความสัมพันธ์เชิงเส้น ไม่ได้ยืนยันเหตุและผล</div></div>`;
+}
+
+function outputRegression(xc, yc) {
+  if (xc === yc) throw new Error('X และ Y ต้องเป็นคนละตัวแปร / X and Y must be different variables');
+  const { x, y } = pairedNumeric(xc, yc);
+  if (x.length < 3) throw new Error('ต้องมีข้อมูลคู่ตัวเลขอย่างน้อย 3 คู่ / At least 3 complete numeric pairs are required');
+  const m = simpleLinearRegression(x, y);
+  return `${outputHeader('regression')}
+    <div class="output-block"><h3>Model Summary / สรุปโมเดล</h3><table class="spss-table"><thead><tr><th>Model</th><th>R</th><th>R Square</th><th>Adjusted R Square</th><th>Std. Error of Estimate</th><th>N</th></tr></thead><tbody><tr><td>1</td><td>${fmt(Math.sqrt(m.r2),4)}</td><td>${fmt(m.r2,4)}</td><td>${fmt(m.adjustedR2,4)}</td><td>${fmt(m.see,4)}</td><td>${m.n}</td></tr></tbody></table></div>
+    <div class="output-block"><h3>ANOVA / การทดสอบโมเดล</h3><table class="spss-table"><thead><tr><th>Source</th><th>Sum of Squares</th><th>df</th><th>Mean Square</th><th>F</th><th>Sig.</th></tr></thead><tbody>
+      <tr><td>Regression</td><td>${fmt(m.ssr,5)}</td><td>${m.dfModel}</td><td>${fmt(m.msModel,5)}</td><td>${fmt(m.f,5)}</td><td>${fmtP(m.pModel)}</td></tr>
+      <tr><td>Residual</td><td>${fmt(m.sse,5)}</td><td>${m.dfResidual}</td><td>${fmt(m.mse,5)}</td><td>—</td><td>—</td></tr>
+      <tr><td>Total</td><td>${fmt(m.sst,5)}</td><td>${m.n-1}</td><td>—</td><td>—</td><td>—</td></tr>
+    </tbody></table></div>
+    <div class="output-block"><h3>Coefficients / สัมประสิทธิ์</h3><table class="spss-table"><thead><tr><th>Term</th><th>B</th><th>Std. Error</th><th>Standardized Beta</th><th>t</th><th>Sig.</th><th>95% CI for B</th></tr></thead><tbody>
+      <tr><td>(Constant)</td><td>${fmt(m.intercept,6)}</td><td>${fmt(m.seIntercept,6)}</td><td>—</td><td>${fmt(m.tIntercept,4)}</td><td>${fmtP(m.pIntercept)}</td><td>[${fmt(m.interceptCi[0],6)}, ${fmt(m.interceptCi[1],6)}]</td></tr>
+      <tr><td>${escapeHtml(xc)}</td><td>${fmt(m.slope,6)}</td><td>${fmt(m.seSlope,6)}</td><td>${fmt(m.r,4)}</td><td>${fmt(m.tSlope,4)}</td><td>${fmtP(m.pSlope)}</td><td>[${fmt(m.slopeCi[0],6)}, ${fmt(m.slopeCi[1],6)}]</td></tr>
+    </tbody></table>
+    <div class="insight-box"><b>Equation / สมการ:</b> ${escapeHtml(yc)} = ${fmt(m.intercept,5)} + ${fmt(m.slope,5)} × ${escapeHtml(xc)}<br><b>Model inference / การทดสอบโมเดล:</b> ${decisionText(m.pModel)}</div>
+    <div class="method-warning">OLS inference assumes an appropriate linear model and well-behaved residuals; inspect residuals before high-stakes interpretation / การอนุมาน OLS ควรตรวจความเป็นเส้นตรงและเศษเหลือก่อนนำไปตัดสินใจสำคัญ</div></div>`;
+}
+
+function outputIndependentT(testVar, groupVar, group1, group2) {
+  if (group1 === group2) throw new Error('กรุณาเลือกสองกลุ่มที่ต่างกัน / Choose two different groups');
+  const g1 = state.rows.filter(r => !isMissing(r[groupVar]) && String(r[groupVar]) === String(group1)).map(r => r[testVar]);
+  const g2 = state.rows.filter(r => !isMissing(r[groupVar]) && String(r[groupVar]) === String(group2)).map(r => r[testVar]);
+  const m = independentTTest(g1, g2);
+  const se1 = m.sd1 / Math.sqrt(m.n1), se2 = m.sd2 / Math.sqrt(m.n2);
+  return `${outputHeader('independentT')}
+    <div class="output-block"><h3>Group Statistics / สถิติรายกลุ่ม</h3><table class="spss-table"><thead><tr><th>${escapeHtml(groupVar)}</th><th>N</th><th>Mean</th><th>Std. Deviation</th><th>Std. Error Mean</th></tr></thead><tbody>
+      <tr><td>${escapeHtml(group1)}</td><td>${m.n1}</td><td>${fmt(m.mean1,5)}</td><td>${fmt(m.sd1,5)}</td><td>${fmt(se1,5)}</td></tr>
+      <tr><td>${escapeHtml(group2)}</td><td>${m.n2}</td><td>${fmt(m.mean2,5)}</td><td>${fmt(m.sd2,5)}</td><td>${fmt(se2,5)}</td></tr>
+    </tbody></table></div>
+    <div class="output-block"><h3>Independent Samples Test / การทดสอบสองกลุ่มอิสระ</h3><div class="caption">Mean Difference = Group 1 − Group 2 / ผลต่างเฉลี่ย = กลุ่ม 1 − กลุ่ม 2</div><div class="data-table-wrap"><table class="spss-table"><thead><tr><th>Variance assumption</th><th>t</th><th>df</th><th>Sig. (2-tailed)</th><th>Mean Difference</th><th>Std. Error Difference</th><th>95% CI Difference</th></tr></thead><tbody>
+      <tr><td>Welch · Equal variances not assumed / ไม่สมมติความแปรปรวนเท่ากัน</td><td>${fmt(m.welch.t,5)}</td><td>${fmt(m.welch.df,4)}</td><td>${fmtP(m.welch.p)}</td><td>${fmt(m.diff,5)}</td><td>${fmt(m.welch.se,5)}</td><td>[${fmt(m.welch.ci[0],5)}, ${fmt(m.welch.ci[1],5)}]</td></tr>
+      <tr><td>Pooled · Equal variances assumed / สมมติความแปรปรวนเท่ากัน</td><td>${fmt(m.pooled.t,5)}</td><td>${m.pooled.df}</td><td>${fmtP(m.pooled.p)}</td><td>${fmt(m.diff,5)}</td><td>${fmt(m.pooled.se,5)}</td><td>[${fmt(m.pooled.ci[0],5)}, ${fmt(m.pooled.ci[1],5)}]</td></tr>
+    </tbody></table></div>
+    <div class="insight-box"><b>Welch inference / ผลแบบ Welch:</b> ${decisionText(m.welch.p)}<br><b>Effect size / ขนาดอิทธิพล:</b> Cohen's d = ${fmt(m.cohenD,4)}, Hedges' g = ${fmt(m.hedgesG,4)}</div>
+    <div class="method-warning">This implementation reports both Welch and pooled results instead of silently choosing an equal-variance assumption. It does not currently run Levene's test / โปรแกรมรายงานทั้งสองวิธีและยังไม่ได้ทำ Levene's test อัตโนมัติ</div></div>`;
+}
+
+function outputPairedT(xc, yc) {
+  if (xc === yc) throw new Error('กรุณาเลือกตัวแปรสองตัวที่ต่างกัน / Choose two different variables');
+  const { x, y } = pairedNumeric(xc, yc);
+  const m = pairedTTest(x, y);
+  return `${outputHeader('pairedT')}
+    <div class="output-block"><h3>Paired Samples Statistics / สถิติข้อมูลจับคู่</h3><table class="spss-table"><thead><tr><th>Variable</th><th>Mean</th><th>N</th><th>Std. Deviation</th><th>Std. Error Mean</th></tr></thead><tbody>
+      <tr><td>${escapeHtml(xc)}</td><td>${fmt(mean(x),5)}</td><td>${x.length}</td><td>${fmt(stdev(x),5)}</td><td>${fmt(standardError(x),5)}</td></tr>
+      <tr><td>${escapeHtml(yc)}</td><td>${fmt(mean(y),5)}</td><td>${y.length}</td><td>${fmt(stdev(y),5)}</td><td>${fmt(standardError(y),5)}</td></tr>
+    </tbody></table></div>
+    <div class="output-block"><h3>Paired Samples Test / การทดสอบแบบจับคู่</h3><table class="spss-table"><thead><tr><th>Pair</th><th>Mean Difference</th><th>Std. Deviation Difference</th><th>Std. Error Difference</th><th>95% CI Difference</th><th>t</th><th>df</th><th>Sig. (2-tailed)</th></tr></thead><tbody><tr>
+      <td>${escapeHtml(xc)} − ${escapeHtml(yc)}</td><td>${fmt(m.meanDifference,5)}</td><td>${fmt(m.sdDifference,5)}</td><td>${fmt(m.seDifference,5)}</td><td>[${fmt(m.ci[0],5)}, ${fmt(m.ci[1],5)}]</td><td>${fmt(m.t,5)}</td><td>${m.df}</td><td>${fmtP(m.p)}</td>
+    </tr></tbody></table>
+    <div class="insight-box">${decisionText(m.p)}<br><b>Paired effect size / ขนาดอิทธิพลแบบจับคู่:</b> Cohen's dz = ${fmt(m.cohenDz,4)}</div></div>`;
+}
+
+function buildContingency(rowCol, colCol) {
+  const { pairs, rowValues, colValues } = completeCategoricalPairs(rowCol, colCol);
+  if (rowValues.length < 2 || colValues.length < 2) throw new Error('Chi-square ต้องมีอย่างน้อย 2 หมวดในแต่ละตัวแปร / Need at least 2 categories per variable');
+  const observed = rowValues.map(rv => colValues.map(cv => pairs.filter(x => String(x[rowCol]) === rv && String(x[colCol]) === cv).length));
+  return { pairs, rowValues, colValues, observed };
+}
+
+function outputChiSquare(rowCol, colCol) {
+  if (rowCol === colCol) throw new Error('กรุณาเลือกตัวแปรสองตัวที่ต่างกัน / Choose two different variables');
+  const { pairs, rowValues, colValues, observed } = buildContingency(rowCol, colCol);
+  const m = chiSquareIndependence(observed);
+  const body = rowValues.map((rv, i) => `<tr><td>${escapeHtml(rv)}</td>${observed[i].map((o, j) => `<td>${o}<small class="expected">E=${fmt(m.expected[i][j],2)}</small></td>`).join('')}<td><b>${m.rowTotals[i]}</b></td></tr>`).join('');
+  const totals = `<tr class="total-row"><td><b>Total</b></td>${m.colTotals.map(v => `<td><b>${v}</b></td>`).join('')}<td><b>${m.total}</b></td></tr>`;
+  const sparsePct = m.cells ? (m.expectedBelow5 / m.cells) * 100 : 0;
+  const warning = m.expectedBelow5
+    ? `<div class="method-warning"><b>Expected-count check / ตรวจ Expected Count:</b> ${m.expectedBelow5}/${m.cells} cells (${fmt(sparsePct,1)}%) have expected count &lt; 5; ${m.expectedBelow1} cell(s) are &lt; 1. A sparse table can weaken the chi-square approximation / ตารางที่เบาบางอาจทำให้การประมาณแบบไคสแควร์ไม่น่าเชื่อถือ ควรพิจารณารวมหมวดหรือใช้ exact method ที่เหมาะสม</div>`
+    : `<div class="insight-box">Expected counts are all at least 5 / Expected Count ทุกช่อง ≥ 5</div>`;
+  return `${outputHeader('chiSquare')}
+    <div class="output-block"><h3>Crosstab: Observed (Expected) / ตารางสังเกต (ค่าคาดหมาย)</h3><div class="data-table-wrap"><table class="spss-table"><thead><tr><th>${escapeHtml(rowCol)}</th>${colValues.map(v => `<th>${escapeHtml(v)}</th>`).join('')}<th>Total</th></tr></thead><tbody>${body}${totals}</tbody></table></div></div>
+    <div class="output-block"><h3>Chi-Square Tests / การทดสอบไคสแควร์</h3><table class="spss-table"><thead><tr><th>Test</th><th>Value</th><th>df</th><th>Asymptotic Sig. (2-sided)</th><th>N</th><th>Cramér's V</th></tr></thead><tbody><tr><td>Pearson Chi-Square</td><td>${fmt(m.chi2,5)}</td><td>${m.df}</td><td>${fmtP(m.p)}</td><td>${m.total}</td><td>${fmt(m.cramerV,4)}</td></tr></tbody></table>
+    <div class="insight-box">${decisionText(m.p)}</div>${warning}</div>`;
+}
+
+function outputAnova(dependent, factor) {
+  const groupsMap = new Map();
+  for (const row of state.rows) {
+    if (isMissing(row[factor]) || isMissing(row[dependent])) continue;
+    const v = Number(row[dependent]);
+    if (!Number.isFinite(v)) continue;
+    const key = String(row[factor]);
+    if (!groupsMap.has(key)) groupsMap.set(key, []);
+    groupsMap.get(key).push(v);
+  }
+  if (groupsMap.size > 50) throw new Error('Factor มีมากกว่า 50 กลุ่ม โปรดกรองก่อน / Factor has more than 50 groups; filter first');
+  const entries = [...groupsMap.entries()].sort((a,b) => naturalCompare(a[0], b[0])).map(([label, values]) => ({ label, values }));
+  const m = oneWayAnova(entries);
+  const desc = m.summaries.map(g => `<tr><td>${escapeHtml(g.label)}</td><td>${g.n}</td><td>${fmt(g.mean,5)}</td><td>${fmt(g.sd,5)}</td></tr>`).join('');
+  return `${outputHeader('anova')}
+    <div class="output-block"><h3>Descriptives by Group / สถิติแยกตามกลุ่ม</h3><table class="spss-table"><thead><tr><th>${escapeHtml(factor)}</th><th>N</th><th>Mean</th><th>Std. Deviation</th></tr></thead><tbody>${desc}</tbody></table></div>
+    <div class="output-block"><h3>ANOVA / การวิเคราะห์ความแปรปรวน</h3><table class="spss-table"><thead><tr><th>Source</th><th>Sum of Squares</th><th>df</th><th>Mean Square</th><th>F</th><th>Sig.</th></tr></thead><tbody>
+      <tr><td>Between Groups</td><td>${fmt(m.ssBetween,5)}</td><td>${m.dfBetween}</td><td>${fmt(m.msBetween,5)}</td><td>${fmt(m.f,5)}</td><td>${fmtP(m.p)}</td></tr>
+      <tr><td>Within Groups</td><td>${fmt(m.ssWithin,5)}</td><td>${m.dfWithin}</td><td>${fmt(m.msWithin,5)}</td><td>—</td><td>—</td></tr>
+      <tr><td>Total</td><td>${fmt(m.ssTotal,5)}</td><td>${m.n-1}</td><td>—</td><td>—</td><td>—</td></tr>
+    </tbody></table>
+    <div class="insight-box">${decisionText(m.p)}<br><b>Effect sizes / ขนาดอิทธิพล:</b> η² = ${fmt(m.etaSquared,4)}, ω² = ${fmt(m.omegaSquared,4)}</div>
+    <div class="method-warning">A significant omnibus ANOVA shows that not all group means are equal; it does not identify which pairs differ. Use an appropriate post-hoc procedure for pairwise conclusions / ANOVA ที่มีนัยสำคัญบอกเพียงว่าค่าเฉลี่ยบางกลุ่มต่างกัน ยังต้องใช้ post-hoc เพื่อระบุคู่ที่ต่าง</div></div>`;
+}
+
+function renderGuide() {
+  const root = $('#guideContent');
+  if (!root) return;
+  const methodCards = Object.keys(analysisInfo).map(key => `<article class="guide-card">${methodCardHtml(key)}</article>`).join('');
+  const tools = [
+    ['Excel', 'ใช้สูตร ตาราง PivotTable และการจัดเตรียมข้อมูลสำหรับงานวิเคราะห์ธุรกิจ', 'Uses formulas, PivotTables, and structured worksheets for business analysis and reporting.', METHOD_SOURCES.excel],
+    ['SQL / SQLite', 'ใช้ดึง กรอง JOIN จัดกลุ่ม และสรุปข้อมูลจากฐานข้อมูลก่อนวิเคราะห์', 'Queries, filters, joins, groups, and aggregates database data before analysis.', METHOD_SOURCES.sqlite],
+    ['R / RStudio', 'ใช้คำนวณสถิติ สร้างโมเดล และกราฟด้วยภาษา R; RStudio เป็นสภาพแวดล้อมสำหรับทำงานกับ R', 'Uses R for statistical computing, modeling, and graphics; RStudio is an IDE commonly used with R.', METHOD_SOURCES.rProject],
+    ['SPSS-style Statistics', 'ใช้สถิติเชิงพรรณนา การทดสอบสมมติฐาน ความสัมพันธ์ และการถดถอยในรูปแบบ Output ที่คุ้นเคย', 'Provides descriptive, hypothesis-testing, association, and regression workflows with familiar statistical output.', METHOD_SOURCES.ibmSpss],
+    ['Power Query', 'ใช้แนวคิด ETL เพื่อเชื่อมต่อ ทำความสะอาด แปลง และเตรียมข้อมูลเป็นขั้นตอนที่ทำซ้ำได้', 'Uses an ETL-style workflow to connect, clean, transform, and prepare data through repeatable steps.', METHOD_SOURCES.powerQuery],
+    ['Power BI', 'ใช้สร้าง data model, measures, interactive reports และ dashboards สำหรับ Business Intelligence', 'Builds data models, measures, interactive reports, and dashboards for business intelligence.', METHOD_SOURCES.powerBi],
+    ['Tableau', 'ใช้ Visual Analytics เพื่อสร้าง worksheet, dashboard และ story สำหรับสื่อสาร insight', 'Uses visual analytics to create worksheets, dashboards, and stories for communicating insights.', METHOD_SOURCES.tableau],
+    ['Business Problem Solving', 'เริ่มจากคำถามธุรกิจ → นิยาม KPI → ตรวจคุณภาพข้อมูล → วิเคราะห์ → ทดสอบสมมติฐาน → สรุป Insight → ข้อเสนอแนะที่นำไปใช้ได้', 'Moves from business question → KPI definition → data quality → analysis → hypothesis testing → insight → actionable recommendation.', null],
+  ];
+  const toolCards = tools.map(([name, th, en, url]) => `<article class="tool-guide-card"><h3>${escapeHtml(name)}</h3><p><b>TH:</b> ${escapeHtml(th)}</p><p><b>EN:</b> ${escapeHtml(en)}</p>${url ? `<a class="source-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Official reference / แหล่งอ้างอิงทางการ ↗</a>` : ''}</article>`).join('');
+  root.innerHTML = `
+    <section class="guide-section accuracy-banner">
+      <div><span class="eyebrow">ACCURACY FIRST</span><h2>Statistical Accuracy / ความถูกต้องทางสถิติ</h2><p><b>TH:</b> สูตรหลักของโมดูลสถิตินี้อิง NIST/SEMATECH e-Handbook และเอกสาร IBM SPSS ทางการ โดยการวิเคราะห์ใช้ข้อมูลทุกแถวในตาราง ส่วน Data View แสดงตัวอย่างเพียง 500 แถวเพื่อความลื่นไหลของ UI</p><p><b>EN:</b> Core formulas follow the NIST/SEMATECH e-Handbook and official IBM SPSS documentation. Analyses use the full current table; only Data View is limited to a 500-row preview for UI performance.</p></div>
+      <div class="accuracy-checks"><span>✓ Sample variance uses n−1</span><span>✓ Pairwise missing-data handling</span><span>✓ Two-tailed p-values</span><span>✓ 95% confidence intervals</span><span>✓ Welch + pooled independent t</span><span>✓ Formula regression tests included</span></div>
+    </section>
+    <section class="guide-section"><div class="guide-heading"><div><span class="eyebrow">STATISTICAL METHODS</span><h2>Formula Guide / คู่มือสูตร</h2></div><p>แต่ละการวิเคราะห์แสดง What it does / ทำอะไร, Formula / สูตร และ Official Sources / แหล่งอ้างอิง</p></div><div class="guide-grid">${methodCards}</div></section>
+    <section class="guide-section"><div class="guide-heading"><div><span class="eyebrow">BUSINESS ANALYST TOOLKIT</span><h2>What each tool is for / แต่ละเครื่องมือใช้ทำอะไร</h2></div></div><div class="tool-guide-grid">${toolCards}</div></section>
+    <section class="guide-section caution-card"><h2>Important limitation / ข้อจำกัดสำคัญ</h2><p><b>TH:</b> โปรแกรมนี้เป็น Web Analytics Studio ที่สร้างขึ้นเองและมีหน้าตา/แนว workflow แบบ SPSS แต่ไม่ใช่ IBM SPSS Statistics การเลือกสถิติที่ถูกต้องยังขึ้นกับการออกแบบการศึกษา ระดับการวัด สมมติฐานของแบบจำลอง และคุณภาพข้อมูล งานที่มีผลต่อการแพทย์ กฎหมาย การเงิน งานวิจัยตีพิมพ์ หรือการตัดสินใจที่มีความเสี่ยงสูงควรตรวจซ้ำด้วยซอฟต์แวร์สถิติที่ได้รับการยอมรับและผู้เชี่ยวชาญที่เกี่ยวข้อง</p><p><b>EN:</b> This is a custom browser analytics studio with an SPSS-style workflow; it is not IBM SPSS Statistics. Correct method selection still depends on study design, measurement level, model assumptions, and data quality. High-stakes or publication work should be independently validated in a recognized statistical package and reviewed by an appropriate expert.</p></section>`;
+}
 
 function populateChartSelectors(){const x=$('#chartX'),y=$('#chartY');if(!x||!y)return;x.innerHTML=optionList();const nums=state.columns.filter(c=>numericValues(c).length>=1);y.innerHTML=optionList(nums.length?nums:state.columns);}
 function aggregateForChart(xCol,yCol,agg,type){if(type==='scatter'){return state.rows.map(r=>({x:Number(r[xCol]),y:Number(r[yCol])})).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)).slice(0,1000)}const groups=new Map();for(const r of state.rows){const k=String(r[xCol]??'(Missing)');if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r[yCol])}const labels=[...groups.keys()].slice(0,50);const data=labels.map(k=>{const vals=groups.get(k).filter(v=>v!==null&&v!==''&&!Number.isNaN(Number(v))).map(Number);if(agg==='count')return groups.get(k).length;if(!vals.length)return 0;return agg==='avg'?mean(vals):vals.reduce((s,v)=>s+v,0)});return{labels,data}}

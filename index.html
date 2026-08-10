@@ -52,6 +52,7 @@
         <button class="nav-item" data-view="spss"><span>Σ</span> SPSS Mode</button>
         <button class="nav-item" data-view="charts"><span>▥</span> Charts</button>
         <button class="nav-item" data-view="dashboard"><span>▤</span> Dashboard</button>
+        <button class="nav-item" data-view="guide"><span>?</span> Guide / คู่มือ</button>
       </div>
 
       <div class="sidebar-section grow">
@@ -87,11 +88,11 @@
 
         <div class="grid-2">
           <article class="panel">
-            <div class="panel-head"><h2>เริ่มต้นใช้งาน</h2></div>
+            <div class="panel-head"><h2>Start / เริ่มต้นใช้งาน</h2></div>
             <div class="quick-actions">
               <button class="quick-card" data-action="open-file"><b>01</b><span><strong>เปิดข้อมูล</strong><small>SQLite / CSV / Excel / SPSS .sav*</small></span></button>
               <button class="quick-card" data-action="go-sql"><b>02</b><span><strong>เขียน SQL</strong><small>SELECT / JOIN / GROUP BY / CTE</small></span></button>
-              <button class="quick-card" data-action="go-spss"><b>03</b><span><strong>วิเคราะห์แบบ SPSS</strong><small>Descriptives / Frequencies / Crosstabs / Correlation / Regression</small></span></button>
+              <button class="quick-card" data-action="go-spss"><b>03</b><span><strong>SPSS-style Statistics / วิเคราะห์สถิติ</strong><small>Descriptives / t-tests / Chi-Square / ANOVA / Correlation / Regression</small></span></button>
               <button class="quick-card" data-action="go-chart"><b>04</b><span><strong>สร้างกราฟ</strong><small>Bar / Line / Pie / Scatter</small></span></button>
             </div>
             <p class="note">* การอ่านไฟล์ .sav เป็นโหมด Experimental และขึ้นกับรูปแบบไฟล์</p>
@@ -139,14 +140,18 @@
       </section>
 
       <section id="view-spss" class="view">
-        <div class="page-header compact"><div><h1>SPSS Mode</h1><p>เมนูสถิติในรูปแบบที่คุ้นเคย โดยประมวลผลด้วย JavaScript ใน Browser</p></div></div>
+        <div class="page-header compact"><div><h1>SPSS Mode</h1><p>Statistical Analysis / การวิเคราะห์สถิติ — สูตรอ้างอิง NIST และแนวทาง IBM SPSS</p></div><span class="pill accuracy-pill">Verified Methods / สูตรตรวจสอบแล้ว</span></div>
         <div class="spss-shell">
           <aside class="analysis-menu panel">
-            <button class="analysis-item active" data-analysis="descriptives">Descriptive Statistics</button>
-            <button class="analysis-item" data-analysis="frequencies">Frequencies</button>
-            <button class="analysis-item" data-analysis="crosstabs">Crosstabs</button>
-            <button class="analysis-item" data-analysis="correlation">Correlations</button>
-            <button class="analysis-item" data-analysis="regression">Linear Regression</button>
+            <button class="analysis-item active" data-analysis="descriptives">Descriptives / สถิติเชิงพรรณนา</button>
+            <button class="analysis-item" data-analysis="frequencies">Frequencies / ความถี่</button>
+            <button class="analysis-item" data-analysis="crosstabs">Crosstabs / ตารางไขว้</button>
+            <button class="analysis-item" data-analysis="correlation">Pearson Correlation / สหสัมพันธ์</button>
+            <button class="analysis-item" data-analysis="regression">Linear Regression / การถดถอย</button>
+            <button class="analysis-item" data-analysis="independentT">Independent t Test / t-test อิสระ</button>
+            <button class="analysis-item" data-analysis="pairedT">Paired t Test / t-test จับคู่</button>
+            <button class="analysis-item" data-analysis="chiSquare">Chi-Square / ไคสแควร์</button>
+            <button class="analysis-item" data-analysis="anova">One-Way ANOVA / ANOVA ทางเดียว</button>
           </aside>
           <div class="analysis-main">
             <article class="panel analysis-config">
@@ -189,6 +194,17 @@
           <article class="metric-card"><span>Missing</span><strong id="dashMissing">0%</strong><small>Missing cells</small></article>
         </div>
         <div id="dashboardCharts" class="dashboard-grid"><div class="panel empty-state">ยังไม่มีกราฟใน Dashboard — สร้างจาก Chart Builder แล้วกด Add to Dashboard</div></div>
+      </section>
+
+
+      <section id="view-guide" class="view">
+        <div class="page-header compact">
+          <div>
+            <h1>Guide & Formula Reference / คู่มือและแหล่งอ้างอิงสูตร</h1>
+            <p>คำอธิบายภาษาไทย + English, สูตรที่ใช้จริงในโปรแกรม, สมมติฐาน และแหล่งอ้างอิงทางการ</p>
+          </div>
+        </div>
+        <div id="guideContent" class="guide-content"></div>
       </section>
     </main>
 
