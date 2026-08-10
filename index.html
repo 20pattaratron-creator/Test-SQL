@@ -529,6 +529,46 @@ in
           </div>
         </div>
 
+        <div class="panel hero-panel">
+          <div>
+            <h3>Excel → SPSS สำหรับคนเริ่มต้น</h3>
+            <p>เพิ่มไฟล์ตัวอย่าง Excel พร้อม Codebook และ Checklist เพื่อให้ผู้ใช้เห็นโครงสร้างตารางที่เหมาะกับ SPSS ก่อนนำเข้าข้อมูลจริง</p>
+          </div>
+          <div class="button-row">
+            <a class="button-link primary" href="./docs/spss_excel_data_entry_template.xlsx" download>ดาวน์โหลด Excel Template</a>
+            <a class="button-link" href="./docs/SPSS_EXCEL_IMPORT_GUIDE_TH.md" download>ดาวน์โหลดคู่มือ Excel → SPSS</a>
+          </div>
+        </div>
+
+        <div class="panel guide">
+          <h3>หลักการทำงานของ SPSS จาก Excel</h3>
+          <ol>
+            <li><strong>Excel เป็นแหล่งข้อมูล:</strong> แถวแรกควรเป็นชื่อตัวแปร เช่น <code>customer_id</code>, <code>net_sales</code>, <code>profit</code> และข้อมูลเริ่มที่แถว 2</li>
+            <li><strong>Data View คือข้อมูลจริง:</strong> เมื่อ Import แล้ว SPSS จะแสดงตารางเหมือน Excel โดย 1 แถวคือ 1 record</li>
+            <li><strong>Variable View คือคำอธิบายข้อมูล:</strong> ต้องตรวจ Type, Label, Values, Missing และ Measure ก่อนวิเคราะห์</li>
+            <li><strong>Value Labels ช่วยแปลรหัส:</strong> เช่น <code>gender</code> เป็น 1=ชาย, 2=หญิง หรือ <code>use_in_analysis</code> เป็น 1=ใช้, 0=ไม่ใช้</li>
+            <li><strong>Measure ต้องถูกต้อง:</strong> กลุ่มข้อมูลใช้ Nominal, ระดับ/อันดับใช้ Ordinal, ตัวเลขต่อเนื่องใช้ Scale</li>
+            <li><strong>Filter ข้อมูลผิด:</strong> ถ้าแถวไหนไม่ควรคำนวณ ให้ใช้ <code>use_in_analysis = 1</code> ใน Data &gt; Select Cases</li>
+          </ol>
+        </div>
+
+        <div class="panel">
+          <h3>ตัวอย่างการตั้งค่าจาก Excel ใน Variable View</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>คอลัมน์จาก Excel</th><th>ความหมาย</th><th>Type ใน SPSS</th><th>Measure</th><th>สิ่งที่ควรตั้งเพิ่ม</th></tr></thead>
+              <tbody>
+                <tr><td>customer_id</td><td>รหัสลูกค้า</td><td>String</td><td>Nominal</td><td>Label = รหัสลูกค้า</td></tr>
+                <tr><td>gender</td><td>เพศ</td><td>Numeric</td><td>Nominal</td><td>Values: 1=ชาย, 2=หญิง, 3=อื่นๆ/ไม่ระบุ</td></tr>
+                <tr><td>satisfaction</td><td>ความพึงพอใจ 1-5</td><td>Numeric</td><td>Ordinal</td><td>Values: 1=น้อยที่สุด ... 5=มากที่สุด</td></tr>
+                <tr><td>category</td><td>หมวดสินค้า</td><td>String</td><td>Nominal</td><td>ใช้ Frequencies หรือ Crosstabs</td></tr>
+                <tr><td>net_sales</td><td>ยอดขายสุทธิ</td><td>Numeric</td><td>Scale</td><td>ใช้ Descriptives / t-test / ANOVA / Regression</td></tr>
+                <tr><td>use_in_analysis</td><td>ใช้ในการวิเคราะห์หรือไม่</td><td>Numeric</td><td>Nominal</td><td>Values: 1=ใช้, 0=ไม่ใช้ และใช้ Select Cases</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="panel guide">
           <h3>เส้นทางใช้งาน SPSS แบบมือใหม่</h3>
           <ol>
@@ -617,6 +657,9 @@ DESCRIPTIVES VARIABLES=net_sales profit quantity discount /STATISTICS=MEAN STDDE
           <h3>เอกสาร SPSS ที่เพิ่มในโปรเจกต์</h3>
           <ul>
             <li><code>docs/SPSS_GUIDE_TH.md</code> — คู่มือ SPSS ภาษาไทยสำหรับผู้เริ่มต้นแบบละเอียด</li>
+            <li><code>docs/SPSS_EXCEL_IMPORT_GUIDE_TH.md</code> — คู่มือใส่ข้อมูลจาก Excel และ Import เข้า SPSS แบบละเอียด</li>
+            <li><code>docs/SPSS_YOUTUBE_LEARNING_NOTES_TH.md</code> — บันทึกหัวข้อจาก YouTube สำหรับเรียน SPSS มือใหม่</li>
+            <li><code>docs/spss_excel_data_entry_template.xlsx</code> — Excel Template พร้อม Data, Codebook และ Checklist</li>
             <li><code>docs/SPSS_SYNTAX_TEMPLATES.sps</code> — Syntax Template สำหรับเปิด CSV และวิเคราะห์ข้อมูลตัวอย่าง</li>
             <li><code>docs/SPSS_VARIABLE_SETUP.md</code> — ตารางแนะนำการตั้งค่า Variable View</li>
           </ul>

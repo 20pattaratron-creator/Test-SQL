@@ -131,3 +131,26 @@ http://localhost:3000/api/health
 - `docs/SPSS_VARIABLE_SETUP.md` ตารางแนะนำการตั้งค่า Variable View เช่น Type, Label, Values, Missing, Measure
 
 แนวทางใช้งานคือ Export CSV จากระบบนี้ แล้วเปิดใน SPSS ผ่าน File > Import Data > CSV/Excel จากนั้นตั้งค่า Variable View และเลือกสถิติ เช่น Frequencies, Descriptives, Crosstabs, t-test, ANOVA, Correlation หรือ Regression ตามคำถามที่ต้องการตอบ
+
+## SPSS Excel/Data Entry Update
+
+เวอร์ชันนี้เพิ่มส่วน SPSS สำหรับคนที่เพิ่งเคยใช้งาน โดยเน้นการเริ่มจาก Excel ไปยัง SPSS:
+
+- เพิ่มแท็บ SPSS ในหน้าเว็บ พร้อมคำอธิบาย Data View / Variable View
+- เพิ่มคู่มือ `docs/SPSS_EXCEL_IMPORT_GUIDE_TH.md`
+- เพิ่มไฟล์ตัวอย่าง `docs/spss_excel_data_entry_template.xlsx`
+- เพิ่มบันทึกหัวข้อจาก YouTube สำหรับมือใหม่ `docs/SPSS_YOUTUBE_LEARNING_NOTES_TH.md`
+- เพิ่มตัวอย่างการตั้งค่า Type, Label, Values, Missing และ Measure
+- เพิ่มแนวทางใช้ `use_in_analysis = 1` เพื่อกรองข้อมูลที่ควรนำไปวิเคราะห์
+
+### วิธีทดลอง SPSS Excel Template
+
+1. เปิดไฟล์ `docs/spss_excel_data_entry_template.xlsx`
+2. ดูชีต `Data_for_SPSS`, `Codebook`, `Checklist`
+3. เปิด IBM SPSS Statistics
+4. ไปที่ `File > Import Data > Excel...`
+5. เลือกไฟล์ Excel Template
+6. เลือกชีต `Data_for_SPSS`
+7. เปิด `Read variable names from the first row of data`
+8. ตรวจ Data View และ Variable View
+9. ตั้งค่า Value Labels และ Measure ตามชีต `Codebook`

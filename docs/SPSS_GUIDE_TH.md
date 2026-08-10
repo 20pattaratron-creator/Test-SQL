@@ -558,3 +558,26 @@ Export Output เป็น PDF/Word
 - IBM SPSS Command Syntax Reference: https://www.ibm.com/docs/en/spss-statistics/31.0.0?topic=reference-introduction-guide-command-syntax
 - IBM Docs: Reading Excel files in SPSS Statistics
 - IBM Docs: DESCRIPTIVES, FREQUENCIES, CROSSTABS, T-TEST, CORRELATIONS, REGRESSION command reference
+
+---
+
+# ภาคผนวก: นำข้อมูลจาก Excel เข้า SPSS สำหรับผู้เริ่มต้น
+
+เพิ่มเอกสารละเอียดไว้ที่ `SPSS_EXCEL_IMPORT_GUIDE_TH.md` และเพิ่มไฟล์ตัวอย่าง `spss_excel_data_entry_template.xlsx`
+
+ลำดับแนะนำสำหรับมือใหม่:
+
+1. เริ่มจาก Excel ที่หัวตารางอยู่แถวแรก
+2. หลีกเลี่ยง merged cells, แถวรวมยอด, หมายเหตุใต้ตาราง และตัวเลขที่ปนข้อความ
+3. เปิด SPSS แล้วใช้ `File > Import Data > Excel...`
+4. เลือกให้ SPSS อ่าน variable names จากแถวแรก
+5. หลัง Import ให้ตรวจ Data View ว่าข้อมูลเข้าครบ
+6. ไปที่ Variable View เพื่อกำหนด Type, Label, Values, Missing และ Measure
+7. บันทึกไฟล์เป็น `.sav`
+8. เริ่มวิเคราะห์ด้วย Frequencies / Descriptives / Crosstabs / Correlation / Regression ตามชนิดตัวแปร
+
+ไฟล์ตัวอย่างมี 3 ชีต:
+
+- `Data_for_SPSS` ตารางข้อมูลที่พร้อมนำเข้า SPSS
+- `Codebook` คำอธิบายตัวแปรและการตั้งค่า Measure
+- `Checklist` รายการตรวจสอบก่อนนำเข้า SPSS
