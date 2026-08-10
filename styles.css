@@ -205,3 +205,25 @@ html[data-theme="light"] .toast-message { background: #ffffff; }
 input[readonly] { opacity: .85; background: var(--panel-soft); }
 @media (max-width: 1080px) { .edit-form-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 680px) { .edit-form-grid { grid-template-columns: 1fr; } }
+
+/* SPSS helper additions */
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  border: 1px solid var(--border);
+  background: var(--panel-soft);
+  color: var(--text);
+  padding: .65rem .85rem;
+  border-radius: .85rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.button-link.primary {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: white;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, .18);
+}
+.button-link:hover { border-color: var(--accent); }

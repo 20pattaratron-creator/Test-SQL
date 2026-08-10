@@ -13,9 +13,9 @@
 <body>
   <header class="app-header">
     <div class="brand-block">
-      <p class="eyebrow">SQLite • SQL • MySQL • Tableau • Power BI • Business Analytics</p>
+      <p class="eyebrow">SQLite • SQL • MySQL • SPSS • Tableau • Power BI • Business Analytics</p>
       <h1>Data Insight SQL Dashboard Pro Friendly</h1>
-      <p class="subtitle">เว็บวิเคราะห์ข้อมูลธีมน้ำเงินสำหรับผู้เริ่มต้น: อัปโหลดไฟล์ กดดู Dashboard วิเคราะห์ธุรกิจ ตรวจคุณภาพข้อมูล และต่อยอดไป SQL / MySQL / Tableau / Power BI ได้เมื่อพร้อม</p>
+      <p class="subtitle">เว็บวิเคราะห์ข้อมูลธีมน้ำเงินสำหรับผู้เริ่มต้น: อัปโหลดไฟล์ กดดู Dashboard วิเคราะห์ธุรกิจ ตรวจคุณภาพข้อมูล และต่อยอดไป SQL / MySQL / SPSS / Tableau / Power BI ได้เมื่อพร้อม</p>
     </div>
     <div class="header-actions">
       <button id="btnSample" class="primary">เริ่มด้วยข้อมูลตัวอย่าง</button>
@@ -87,6 +87,7 @@
         <button class="tab" data-tab="mysql">MySQL</button>
         <button class="tab" data-tab="tableau">Tableau</button>
         <button class="tab" data-tab="powerbi">Power BI</button>
+        <button class="tab" data-tab="spss">SPSS</button>
         <button class="tab" data-tab="guide">คู่มือ</button>
       </nav>
 
@@ -501,6 +502,127 @@ in
         <div class="panel"><div id="powerBiEmbed" class="tableau-box">ใส่ Power BI URL หรือ iframe HTML แล้วกด Load Power BI</div></div>
       </section>
 
+      <section id="spss" class="tab-panel">
+        <div class="panel hero-panel">
+          <div>
+            <h2>SPSS Helper สำหรับผู้เริ่มต้น</h2>
+            <p>ส่วนนี้ช่วยให้ผู้ใช้ที่ไม่เคยใช้ SPSS เข้าใจตั้งแต่การเตรียมไฟล์ CSV/Excel, Data View, Variable View, การกำหนดชนิดตัวแปร, การตรวจข้อมูล และการเลือกสถิติให้ตรงคำถาม</p>
+          </div>
+          <a class="button-link primary" href="./docs/SPSS_SYNTAX_TEMPLATES.sps" download>ดาวน์โหลด SPSS Syntax</a>
+        </div>
+
+        <div class="quick-start-grid">
+          <div class="panel quick-card">
+            <div class="quick-icon">1</div>
+            <h3>เตรียมไฟล์จากระบบนี้</h3>
+            <p>Export CSV จาก Dashboard / SQL Result / Table Browser แล้วนำไฟล์ไปเปิดใน SPSS ด้วยเมนู File &gt; Import Data &gt; CSV หรือ Excel</p>
+          </div>
+          <div class="panel quick-card">
+            <div class="quick-icon">2</div>
+            <h3>ตั้งค่า Variable View</h3>
+            <p>กำหนด Type, Label, Values, Missing และ Measure ให้ถูกต้อง เช่น customer_id เป็น Nominal, satisfaction เป็น Ordinal, net_sales เป็น Scale</p>
+          </div>
+          <div class="panel quick-card">
+            <div class="quick-icon">3</div>
+            <h3>เลือกสถิติให้ตรงคำถาม</h3>
+            <p>ใช้ Frequencies/Descriptives เพื่อดูภาพรวม, Crosstabs เพื่อดูความสัมพันธ์ตัวแปรกลุ่ม, Correlation/Regression เพื่อดูความสัมพันธ์เชิงตัวเลข</p>
+          </div>
+        </div>
+
+        <div class="panel guide">
+          <h3>เส้นทางใช้งาน SPSS แบบมือใหม่</h3>
+          <ol>
+            <li><strong>นำเข้าข้อมูล:</strong> File &gt; Import Data &gt; CSV/Excel แล้วเลือกไฟล์ที่ Export จากเว็บนี้</li>
+            <li><strong>ตรวจ Data View:</strong> ดูแถวและคอลัมน์ว่าข้อมูลเข้า SPSS ครบหรือไม่</li>
+            <li><strong>ตรวจ Variable View:</strong> เปลี่ยน Measure เป็น Nominal / Ordinal / Scale ให้เหมาะสมก่อนวิเคราะห์</li>
+            <li><strong>กำหนด Missing:</strong> ถ้าข้อมูลมีรหัส 99, 999 หรือช่องว่างแทนคำตอบที่หาย ให้ตั้งเป็น Missing Value</li>
+            <li><strong>เริ่มวิเคราะห์พื้นฐาน:</strong> Analyze &gt; Descriptive Statistics &gt; Frequencies หรือ Descriptives</li>
+            <li><strong>วิเคราะห์ความสัมพันธ์:</strong> Crosstabs, Correlation หรือ Regression ตามชนิดตัวแปร</li>
+            <li><strong>อ่านผลลัพธ์:</strong> ดูค่า N, Mean, Std. Deviation, p-value, R, R Square และ Sig. อย่างระมัดระวัง</li>
+            <li><strong>บันทึกผล:</strong> Save เป็น .sav และ Export Output เป็น PDF/Word/Excel เพื่อแนบรายงาน</li>
+          </ol>
+        </div>
+
+        <div class="panel">
+          <h3>เลือกเมนู SPSS ตามคำถามที่ต้องการตอบ</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>คำถามทางธุรกิจ/ข้อมูล</th><th>เมนู SPSS</th><th>ใช้เมื่อไร</th><th>ผลลัพธ์ที่ควรอ่าน</th></tr></thead>
+              <tbody>
+                <tr><td>ข้อมูลแต่ละคอลัมน์มีจำนวน/สัดส่วนเท่าไร</td><td>Analyze &gt; Descriptive Statistics &gt; Frequencies</td><td>ตัวแปรกลุ่ม เช่น region, channel, category</td><td>Frequency, Percent, Valid Percent</td></tr>
+                <tr><td>ยอดขาย/กำไรเฉลี่ยเท่าไร กระจายมากไหม</td><td>Analyze &gt; Descriptive Statistics &gt; Descriptives</td><td>ตัวแปรตัวเลข เช่น net_sales, profit</td><td>Mean, Std. Deviation, Min, Max</td></tr>
+                <tr><td>ช่องทางขายสัมพันธ์กับสถานะคำสั่งซื้อไหม</td><td>Analyze &gt; Descriptive Statistics &gt; Crosstabs</td><td>ตัวแปรกลุ่ม 2 ตัว</td><td>Chi-square Sig., Row %, Column %</td></tr>
+                <tr><td>ยอดขาย Online กับ Store ต่างกันไหม</td><td>Analyze &gt; Compare Means &gt; Independent-Samples T Test</td><td>ตัวเลข 1 ตัว เทียบกลุ่ม 2 กลุ่ม</td><td>Levene's Test, Sig. (2-tailed), Mean Difference</td></tr>
+                <tr><td>ยอดขายต่างกันตามหลายภูมิภาคไหม</td><td>Analyze &gt; Compare Means &gt; One-Way ANOVA</td><td>ตัวเลข 1 ตัว เทียบกลุ่ม 3 กลุ่มขึ้นไป</td><td>F, Sig., Post Hoc</td></tr>
+                <tr><td>ส่วนลดสัมพันธ์กับยอดขายหรือกำไรไหม</td><td>Analyze &gt; Correlate &gt; Bivariate</td><td>ตัวแปรตัวเลข 2 ตัวขึ้นไป</td><td>Pearson Correlation, Sig.</td></tr>
+                <tr><td>ปัจจัยใดช่วยทำนายยอดขาย/กำไร</td><td>Analyze &gt; Regression &gt; Linear</td><td>ตัวแปรตามเป็นตัวเลข</td><td>R Square, ANOVA Sig., Coefficients</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="panel">
+            <h3>ตัวอย่าง SPSS Syntax สำหรับไฟล์จากเว็บนี้</h3>
+            <pre class="code-box">* 1) เปิดไฟล์ CSV ที่ Export จากระบบนี้.
+GET DATA
+  /TYPE=TXT
+  /FILE='sample_sales.csv'
+  /ENCODING='UTF8'
+  /DELCASE=LINE
+  /DELIMITERS="," 
+  /QUALIFIER='"'
+  /ARRANGEMENT=DELIMITED
+  /FIRSTCASE=2
+  /VARIABLES=
+    order_id A20
+    order_date A10
+    customer_id A20
+    customer_name A80
+    product_id A20
+    category A40
+    product_name A80
+    region A40
+    channel A40
+    quantity F8.0
+    unit_price F12.2
+    discount F8.4
+    cost F12.2
+    order_status A30
+    gross_sales F12.2
+    discount_amount F12.2
+    net_sales F12.2
+    total_cost F12.2
+    profit F12.2
+    exclude_from_analysis F1.0.
+EXECUTE.
+
+* 2) ดูภาพรวม.
+FREQUENCIES VARIABLES=category region channel order_status.
+DESCRIPTIVES VARIABLES=net_sales profit quantity discount /STATISTICS=MEAN STDDEV MIN MAX.</pre>
+          </div>
+          <div class="panel">
+            <h3>Checklist ก่อนกดวิเคราะห์ใน SPSS</h3>
+            <div class="step-list">
+              <div><span>✓</span><p>หัวตารางต้องไม่มีช่องว่างหรือสัญลักษณ์แปลก เช่น ใช้ net_sales แทน Net Sales</p></div>
+              <div><span>✓</span><p>ตัวเลขต้องเป็น Number/Scale ไม่ใช่ String เช่น net_sales, profit, quantity</p></div>
+              <div><span>✓</span><p>ตัวแปรกลุ่มต้องกำหนด Measure เป็น Nominal เช่น channel, region, category</p></div>
+              <div><span>✓</span><p>ถ้ามีข้อมูลผิดหรือ null ให้แก้ในเว็บนี้ก่อน หรือใช้ Select Cases/Filter ใน SPSS</p></div>
+              <div><span>✓</span><p>อย่าสรุปจาก p-value อย่างเดียว ให้ดูขนาดผล, ค่าเฉลี่ย, และบริบทธุรกิจร่วมด้วย</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel guide">
+          <h3>เอกสาร SPSS ที่เพิ่มในโปรเจกต์</h3>
+          <ul>
+            <li><code>docs/SPSS_GUIDE_TH.md</code> — คู่มือ SPSS ภาษาไทยสำหรับผู้เริ่มต้นแบบละเอียด</li>
+            <li><code>docs/SPSS_SYNTAX_TEMPLATES.sps</code> — Syntax Template สำหรับเปิด CSV และวิเคราะห์ข้อมูลตัวอย่าง</li>
+            <li><code>docs/SPSS_VARIABLE_SETUP.md</code> — ตารางแนะนำการตั้งค่า Variable View</li>
+          </ul>
+        </div>
+      </section>
+
       <section id="guide" class="tab-panel">
         <div class="panel guide">
           <h2>คู่มือเร็ว</h2>
@@ -513,8 +635,9 @@ in
             <li>ใช้ MySQL Helper เพื่อสร้าง Query สำหรับ MySQL Workbench</li>
             <li>ใช้ Tableau Helper เพื่อเตรียมสูตรและฝัง Dashboard</li>
             <li>ใช้ Power BI Helper เพื่อเตรียม DAX, Power Query และฝังรายงาน Power BI</li>
+            <li>ใช้ SPSS Helper เพื่อเรียนวิธีนำข้อมูลไปวิเคราะห์ใน IBM SPSS Statistics สำหรับผู้เริ่มต้น</li>
           </ol>
-          <p>เอกสารละเอียดอยู่ในโฟลเดอร์ <code>docs/</code> ได้แก่ INSTALL_TH.md, USER_GUIDE_TH.md, TEST_PLAN_TH.md, SECURITY_TH.md, POWERBI_GUIDE_TH.md</p>
+          <p>เอกสารละเอียดอยู่ในโฟลเดอร์ <code>docs/</code> ได้แก่ INSTALL_TH.md, USER_GUIDE_TH.md, TEST_PLAN_TH.md, SECURITY_TH.md, POWERBI_GUIDE_TH.md, SPSS_GUIDE_TH.md</p>
         </div>
       </section>
     </section>

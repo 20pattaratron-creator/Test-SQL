@@ -121,3 +121,13 @@ http://localhost:3000/api/health
 - เพิ่มหน้าฟอร์มแก้ไขข้อมูลรายแถวโดยไม่ต้องเขียน SQL
 - เพิ่มตัวเลือก `_exclude_from_analysis` เพื่อไม่นำแถวที่ผิด/รอตรวจสอบไปคำนวณ Dashboard และ Business Analytics
 - เพิ่มคู่มือ `docs/REFERENCE_DATA_GUIDE_TH.md`
+
+## SPSS Add-on สำหรับผู้เริ่มต้น
+
+เวอร์ชันนี้เพิ่มส่วน SPSS เพื่อช่วยผู้ใช้ที่ต้องการนำข้อมูลจากเว็บไปวิเคราะห์ต่อใน IBM SPSS Statistics โดยมีทั้งหน้า SPSS Helper ในเว็บและเอกสารในโฟลเดอร์ `docs/`:
+
+- `docs/SPSS_GUIDE_TH.md` คู่มือ SPSS ภาษาไทยสำหรับผู้เริ่มต้น
+- `docs/SPSS_SYNTAX_TEMPLATES.sps` ตัวอย่าง SPSS Syntax สำหรับเปิด CSV และวิเคราะห์ข้อมูล
+- `docs/SPSS_VARIABLE_SETUP.md` ตารางแนะนำการตั้งค่า Variable View เช่น Type, Label, Values, Missing, Measure
+
+แนวทางใช้งานคือ Export CSV จากระบบนี้ แล้วเปิดใน SPSS ผ่าน File > Import Data > CSV/Excel จากนั้นตั้งค่า Variable View และเลือกสถิติ เช่น Frequencies, Descriptives, Crosstabs, t-test, ANOVA, Correlation หรือ Regression ตามคำถามที่ต้องการตอบ

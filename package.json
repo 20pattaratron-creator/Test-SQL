@@ -1,6 +1,6 @@
 {
   "name": "data-insight-sql-dashboard-pro-friendly-editable",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "type": "module",
   "scripts": {
     "check": "node --check app.js && node --check api/health.js && node --check api/query.js && node --check backend-node/server.js",
@@ -13,5 +13,5 @@
   "devDependencies": {
     "vercel": "^46.0.0"
   },
-  "description": "Data Insight SQL Dashboard Pro Friendly with reference tables, editable records, blue light/dark theme, Business Analytics, SQLite, MySQL, Tableau and Power BI add-on"
+  "description": "Data Insight SQL Dashboard Pro Friendly with reference tables, editable records, blue light/dark theme, Business Analytics, SQLite, MySQL, Tableau and Power BI and SPSS add-on"
 }
