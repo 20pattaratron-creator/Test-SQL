@@ -10,6 +10,10 @@ const state = {
   theme: 'light',
   objectTypes: {},
   editing: { table: '', rowid: null, columns: [] },
+  cmEditor: null,
+  browserPage: 0,
+  browserSort: { col: null, dir: 1 },
+  wizardColumns: [],
 };
 
 const $ = (id) => document.getElementById(id);
@@ -101,6 +105,11 @@ async function init() {
     state.db = new state.SQL.Database();
     initTheme();
     setStatus('พร้อมใช้งาน: เริ่มด้วยข้อมูลตัวอย่าง หรืออัปโหลด CSV ได้', 'ok');
+    initSqlEditor();
+    if (!state.wizardColumns.length) {
+      state.wizardColumns = [{ name: 'id', type: 'INTEGER', pk: true, notNull: false, dflt: '' }];
+    }
+    renderWizardColumns();
     bindEvents();
     refreshAll();
   } catch (error) {
@@ -128,9 +137,9 @@ function bindEvents() {
   $('btnRunSql').addEventListener('click', runSqlEditor);
   $('btnExportSqlCsv').addEventListener('click', exportLastSqlCsv);
   $('btnExportTableCsv').addEventListener('click', exportBrowserCsv);
-  $('browserTable').addEventListener('change', renderBrowser);
-  $('browserSearch').addEventListener('input', renderBrowser);
-  $('browserLimit').addEventListener('change', renderBrowser);
+  $('browserTable').addEventListener('change', () => { state.browserPage = 0; state.browserSort = { col: null, dir: 1 }; renderBrowser(); });
+  $('browserSearch').addEventListener('input', () => { state.browserPage = 0; renderBrowser(); });
+  $('browserLimit').addEventListener('change', () => { state.browserPage = 0; renderBrowser(); });
   $('dashTable').addEventListener('change', populateDashboardColumns);
   $('baTable').addEventListener('change', populateBusinessColumns);
   ['metricColumn', 'profitColumn', 'dateColumn', 'categoryColumn', 'customerColumn'].forEach(id => $(id).addEventListener('change', renderDashboard));
@@ -150,15 +159,29 @@ function bindEvents() {
   $('btnExcludeRow').addEventListener('click', () => setEditExclude(true));
   $('btnIncludeRow').addEventListener('click', () => setEditExclude(false));
   document.addEventListener('click', handleRowActionClick);
-  document.querySelectorAll('.sql-template').forEach(btn => btn.addEventListener('click', () => { $('sqlInput').value = btn.dataset.sql; runSqlEditor(); }));
+  document.querySelectorAll('.sql-template').forEach(btn => btn.addEventListener('click', () => { setSqlValue(btn.dataset.sql); runSqlEditor(); }));
   $('sqlInput').addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runSqlEditor();
   });
+  $('btnExportSqlJson').addEventListener('click', exportLastSqlJson);
+  $('btnExportTableJson').addEventListener('click', exportBrowserJson);
+  $('btnDropTable').addEventListener('click', dropCurrentTable);
+  $('btnTruncateTable').addEventListener('click', truncateCurrentTable);
+  $('btnDeleteSelectedRows').addEventListener('click', deleteSelectedBrowserRows);
+  $('btnBrowserPrev').addEventListener('click', () => changeBrowserPage(-1));
+  $('btnBrowserNext').addEventListener('click', () => changeBrowserPage(1));
+  $('btnAddWizardColumn').addEventListener('click', addWizardColumn);
+  $('btnCreateWizardTable').addEventListener('click', createWizardTable);
+  $('wizardTableName').addEventListener('input', renderWizardSqlPreview);
+  document.addEventListener('click', handleWizardColumnClick);
+  document.addEventListener('input', handleWizardColumnInput);
+  document.addEventListener('click', handleBrowserSortClick);
 }
 
 function switchTab(tabName) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === tabName));
+  if (tabName === 'sql' && state.cmEditor) setTimeout(() => state.cmEditor.refresh(), 0);
   if (tabName === 'browser') renderBrowser();
   if (tabName === 'quality') renderQuality();
   if (tabName === 'dashboard') renderDashboard();
@@ -910,8 +933,44 @@ function countDuplicates(rows) {
   return dup;
 }
 
+function initSqlEditor() {
+  const textarea = $('sqlInput');
+  if (!textarea || typeof CodeMirror === 'undefined') return;
+  state.cmEditor = CodeMirror.fromTextArea(textarea, {
+    mode: 'text/x-sql',
+    lineNumbers: true,
+    lineWrapping: true,
+    matchBrackets: true,
+    indentWithTabs: true,
+    extraKeys: {
+      'Ctrl-Enter': () => runSqlEditor(),
+      'Cmd-Enter': () => runSqlEditor(),
+      'Ctrl-Space': (cm) => cm.showHint({ hint: CodeMirror.hint.sql, tables: sqlHintTables(), completeSingle: false }),
+      'Ctrl-S': () => { saveDb(); return false; },
+    },
+  });
+  state.cmEditor.on('change', (cm) => cm.save());
+}
+
+function sqlHintTables() {
+  const tables = {};
+  (state.tables || []).forEach((t) => {
+    try { tables[t] = getColumns(t).map((c) => c.name); } catch (_err) { /* ignore */ }
+  });
+  return tables;
+}
+
+function getSqlValue() {
+  return (state.cmEditor ? state.cmEditor.getValue() : $('sqlInput').value).trim();
+}
+
+function setSqlValue(text) {
+  if (state.cmEditor) state.cmEditor.setValue(text);
+  else $('sqlInput').value = text;
+}
+
 function runSqlEditor() {
-  const sql = $('sqlInput').value.trim();
+  const sql = getSqlValue();
   if (!sql) return;
   const started = performance.now();
   try {
@@ -942,24 +1001,216 @@ function runSqlEditor() {
 
 function addHistory(sql, rows, ms) {
   state.queryHistory.unshift({ sql, rows, ms, at: new Date().toLocaleString('th-TH') });
-  state.queryHistory = state.queryHistory.slice(0, 30);
+  state.queryHistory = state.queryHistory.slice(0, 200);
   const host = $('queryHistory');
   host.className = 'history-list';
-  host.innerHTML = state.queryHistory.map((h, i) => `<button class="history-item" data-history="${i}">${escapeHtml(h.at)} • ${h.rows} rows • ${h.ms} ms • ${escapeHtml(h.sql)}</button>`).join('');
-  host.querySelectorAll('[data-history]').forEach(btn => btn.addEventListener('click', () => { $('sqlInput').value = state.queryHistory[Number(btn.dataset.history)].sql; }));
+  host.innerHTML = state.queryHistory.map((h, i) => `<button class="history-item" data-history="${i}" title="คลิกเพื่อเปิดคำสั่งนี้อีกครั้ง">${escapeHtml(h.at)} • ${h.rows} rows • ${h.ms} ms • ${escapeHtml(h.sql)}</button>`).join('');
+  host.querySelectorAll('[data-history]').forEach(btn => btn.addEventListener('click', () => {
+    setSqlValue(state.queryHistory[Number(btn.dataset.history)].sql);
+    switchTab('sql');
+    runSqlEditor();
+  }));
 }
 
 function renderBrowser() {
   const table = $('browserTable').value || state.tables[0];
-  if (!table) { $('browserResult').innerHTML = 'ยังไม่มีตาราง'; return; }
-  const limit = Number($('browserLimit').value || 100);
+  if (!table) { $('browserResult').innerHTML = 'ยังไม่มีตาราง'; $('browserPageInfo').textContent = ''; return; }
+  const limit = Number($('browserLimit').value || 50);
   const search = $('browserSearch').value.trim().toLowerCase();
   const editable = isEditableTable(table);
   if (editable) ensureGovernanceColumns(table);
   const cols = getColumns(table).map(c => c.name);
-  let rows = query(`SELECT ${editable ? 'rowid AS _rowid, ' : ''}* FROM ${quoteIdent(table)} LIMIT 10000;`).rows;
+  let rows = query(`SELECT ${editable ? 'rowid AS _rowid, ' : ''}* FROM ${quoteIdent(table)} LIMIT 20000;`).rows;
   if (search) rows = rows.filter(r => ['_rowid', ...cols].some(c => String(r[c] ?? '').toLowerCase().includes(search)));
-  $('browserResult').innerHTML = editable ? renderEditableTable(table, cols, rows.slice(0, limit)) : renderTable(cols, rows.slice(0, limit));
+
+  const sort = state.browserSort;
+  if (sort.col && (sort.col === '_rowid' || cols.includes(sort.col))) {
+    rows = rows.slice().sort((a, b) => {
+      const av = a[sort.col];
+      const bv = b[sort.col];
+      const an = Number(av);
+      const bn = Number(bv);
+      let cmp;
+      if (av !== null && av !== '' && bv !== null && bv !== '' && !Number.isNaN(an) && !Number.isNaN(bn)) cmp = an - bn;
+      else cmp = String(av ?? '').localeCompare(String(bv ?? ''), 'th');
+      return cmp * sort.dir;
+    });
+  }
+
+  const totalRows = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / limit));
+  if (state.browserPage >= totalPages) state.browserPage = totalPages - 1;
+  if (state.browserPage < 0) state.browserPage = 0;
+  const start = state.browserPage * limit;
+  const pageRows = rows.slice(start, start + limit);
+
+  $('browserResult').innerHTML = editable ? renderEditableTable(table, cols, pageRows, sort) : renderSortableTable(cols, pageRows, sort);
+  $('browserPageInfo').textContent = totalRows ? `หน้า ${state.browserPage + 1} / ${totalPages} • ทั้งหมด ${totalRows} แถว` : 'ไม่มีข้อมูล';
+  bindBrowserCheckboxEvents();
+}
+
+function changeBrowserPage(delta) {
+  state.browserPage += delta;
+  if (state.browserPage < 0) state.browserPage = 0;
+  renderBrowser();
+}
+
+function handleBrowserSortClick(event) {
+  const th = event.target.closest('[data-sort-col]');
+  if (!th || !th.closest('#browserResult')) return;
+  const col = th.dataset.sortCol;
+  if (state.browserSort.col === col) state.browserSort.dir *= -1;
+  else state.browserSort = { col, dir: 1 };
+  state.browserPage = 0;
+  renderBrowser();
+}
+
+function sortArrow(col, sort) {
+  if (sort.col !== col) return '';
+  return sort.dir === 1 ? ' <span class="sort-arrow">▲</span>' : ' <span class="sort-arrow">▼</span>';
+}
+
+function renderSortableTable(columns, rows, sort) {
+  if (!columns || !columns.length) return '<p class="status warn">ไม่มีข้อมูลแสดงผล</p>';
+  const thead = `<thead><tr>${columns.map(c => `<th class="sortable" data-sort-col="${escapeHtml(c)}">${escapeHtml(c)}${sortArrow(c, sort)}</th>`).join('')}</tr></thead>`;
+  const tbody = `<tbody>${rows.map(r => `<tr>${columns.map(c => `<td>${escapeHtml(r[c])}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  return `<table>${thead}${tbody}</table>`;
+}
+
+function bindBrowserCheckboxEvents() {
+  const selectAll = $('browserSelectAll');
+  if (!selectAll) return;
+  selectAll.addEventListener('change', () => {
+    document.querySelectorAll('#browserResult .row-select').forEach((cb) => { cb.checked = selectAll.checked; });
+  });
+}
+
+function deleteSelectedBrowserRows() {
+  const table = $('browserTable').value || state.tables[0];
+  if (!table) return toast('ยังไม่มีตาราง', 'error');
+  if (!isEditableTable(table)) return toast('ลบหลายแถวได้เฉพาะตารางข้อมูลจริงเท่านั้น', 'error');
+  const ids = Array.from(document.querySelectorAll('#browserResult .row-select:checked'))
+    .map((cb) => Number(cb.dataset.rowid))
+    .filter(Number.isFinite);
+  if (!ids.length) return toast('ยังไม่ได้เลือกแถวที่จะลบ', 'error');
+  if (!confirm(`ยืนยันลบ ${ids.length} แถวจากตาราง "${table}" การลบนี้ย้อนกลับไม่ได้`)) return;
+  try {
+    run(`DELETE FROM ${quoteIdent(table)} WHERE rowid IN (${ids.join(',')});`);
+    toast(`ลบ ${ids.length} แถวสำเร็จ`, 'success');
+    renderBrowser();
+    refreshAll();
+  } catch (error) {
+    toast(`ลบแถวไม่สำเร็จ: ${error.message}`, 'error');
+  }
+}
+
+function dropCurrentTable() {
+  const table = $('browserTable').value || state.tables[0];
+  if (!table) return toast('ยังไม่มีตารางให้ลบ', 'error');
+  if (!confirm(`ยืนยันลบตาราง "${table}" ทั้งโครงสร้างและข้อมูล การลบนี้ย้อนกลับไม่ได้`)) return;
+  try {
+    run(`DROP TABLE ${quoteIdent(table)};`);
+    toast(`ลบตาราง "${table}" สำเร็จ`, 'success');
+    state.browserPage = 0;
+    refreshAll();
+  } catch (error) {
+    toast(`ลบตารางไม่สำเร็จ: ${error.message}`, 'error');
+  }
+}
+
+function truncateCurrentTable() {
+  const table = $('browserTable').value || state.tables[0];
+  if (!table) return toast('ยังไม่มีตารางให้ล้างข้อมูล', 'error');
+  if (!confirm(`ยืนยันล้างข้อมูลทั้งหมดในตาราง "${table}" (โครงสร้างตารางยังอยู่) การลบนี้ย้อนกลับไม่ได้`)) return;
+  try {
+    run(`DELETE FROM ${quoteIdent(table)};`);
+    toast(`ล้างข้อมูลตาราง "${table}" สำเร็จ`, 'success');
+    state.browserPage = 0;
+    renderBrowser();
+    refreshAll();
+  } catch (error) {
+    toast(`ล้างข้อมูลไม่สำเร็จ: ${error.message}`, 'error');
+  }
+}
+
+const WIZARD_SQLITE_TYPES = ['INTEGER', 'TEXT', 'REAL', 'BLOB', 'NUMERIC'];
+
+function renderWizardColumns() {
+  const host = $('wizardColumns');
+  if (!host) return;
+  host.innerHTML = state.wizardColumns.map((col, idx) => `
+    <div class="wizard-col-row" data-idx="${idx}">
+      <input type="text" data-wizard-field="name" data-idx="${idx}" value="${escapeHtml(col.name)}" placeholder="ชื่อคอลัมน์" />
+      <select data-wizard-field="type" data-idx="${idx}">
+        ${WIZARD_SQLITE_TYPES.map((t) => `<option value="${t}" ${col.type === t ? 'selected' : ''}>${t}</option>`).join('')}
+      </select>
+      <label class="form-check"><input type="checkbox" data-wizard-field="pk" data-idx="${idx}" ${col.pk ? 'checked' : ''} /> PK</label>
+      <label class="form-check"><input type="checkbox" data-wizard-field="notNull" data-idx="${idx}" ${col.notNull ? 'checked' : ''} /> NOT NULL</label>
+      <input type="text" data-wizard-field="dflt" data-idx="${idx}" value="${escapeHtml(col.dflt)}" placeholder="ค่าเริ่มต้น (ถ้ามี)" />
+      <button type="button" class="small-btn" data-wizard-remove="${idx}" ${state.wizardColumns.length <= 1 ? 'disabled' : ''}>ลบ</button>
+    </div>`).join('');
+  renderWizardSqlPreview();
+}
+
+function addWizardColumn() {
+  state.wizardColumns.push({ name: '', type: 'TEXT', pk: false, notNull: false, dflt: '' });
+  renderWizardColumns();
+}
+
+function handleWizardColumnClick(event) {
+  const btn = event.target.closest('[data-wizard-remove]');
+  if (!btn) return;
+  const idx = Number(btn.dataset.wizardRemove);
+  if (state.wizardColumns.length <= 1) return;
+  state.wizardColumns.splice(idx, 1);
+  renderWizardColumns();
+}
+
+function handleWizardColumnInput(event) {
+  const field = event.target.dataset.wizardField;
+  if (!field) return;
+  const idx = Number(event.target.dataset.idx);
+  if (!state.wizardColumns[idx]) return;
+  if (field === 'pk' || field === 'notNull') state.wizardColumns[idx][field] = event.target.checked;
+  else state.wizardColumns[idx][field] = event.target.value;
+  renderWizardSqlPreview();
+}
+
+function buildWizardSql() {
+  const name = safeIdentifier($('wizardTableName').value || 'new_table');
+  const colsSql = state.wizardColumns
+    .filter((c) => c.name.trim())
+    .map((c) => {
+      let line = `  ${quoteIdent(safeIdentifier(c.name))} ${c.type}`;
+      if (c.pk) line += ' PRIMARY KEY';
+      if (c.notNull) line += ' NOT NULL';
+      const dflt = c.dflt.trim();
+      if (dflt) line += ` DEFAULT ${/^-?\d+(\.\d+)?$/.test(dflt) ? dflt : `'${dflt.replaceAll("'", "''")}'`}`;
+      return line;
+    });
+  if (!colsSql.length) return `CREATE TABLE ${quoteIdent(name)} (\n  -- เพิ่มอย่างน้อย 1 คอลัมน์\n);`;
+  return `CREATE TABLE ${quoteIdent(name)} (\n${colsSql.join(',\n')}\n);`;
+}
+
+function renderWizardSqlPreview() {
+  const el = $('wizardSqlPreview');
+  if (el) el.textContent = buildWizardSql();
+}
+
+function createWizardTable() {
+  if (!$('wizardTableName').value.trim()) return toast('กรุณาใส่ชื่อตาราง', 'error');
+  if (!state.wizardColumns.some((c) => c.name.trim())) return toast('กรุณาใส่ชื่อคอลัมน์อย่างน้อย 1 คอลัมน์', 'error');
+  const sql = buildWizardSql();
+  try {
+    run(sql);
+    toast(`สร้างตาราง "${safeIdentifier($('wizardTableName').value)}" สำเร็จ`, 'success');
+    $('wizardTableName').value = '';
+    state.wizardColumns = [{ name: 'id', type: 'INTEGER', pk: true, notNull: false, dflt: '' }];
+    renderWizardColumns();
+    refreshAll();
+  } catch (error) {
+    toast(`สร้างตารางไม่สำเร็จ: ${error.message}`, 'error');
+  }
 }
 
 
@@ -1123,13 +1374,21 @@ function renderIssueTable(table, rows) {
   return `<table>${thead}${tbody}</table>`;
 }
 
-function renderEditableTable(table, columns, rows) {
+function renderEditableTable(table, columns, rows, sort = state.browserSort) {
   const displayCols = ['action', '_rowid', ...columns];
-  const thead = `<thead><tr>${displayCols.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>`;
-  const tbody = `<tbody>${rows.map(r => `<tr>${displayCols.map(c => {
-    if (c === 'action') return `<td><button class="small-btn" data-edit-row="${escapeHtml(r._rowid)}" data-table="${escapeHtml(table)}">แก้ไข</button></td>`;
-    return `<td>${escapeHtml(r[c])}</td>`;
-  }).join('')}</tr>`).join('')}</tbody>`;
+  const thead = `<thead><tr>
+    <th class="checkbox-cell"><input type="checkbox" id="browserSelectAll" title="เลือกทั้งหมดในหน้านี้" /></th>
+    ${displayCols.map(c => c === 'action'
+      ? '<th>action</th>'
+      : `<th class="sortable" data-sort-col="${escapeHtml(c)}">${escapeHtml(c)}${sortArrow(c, sort)}</th>`).join('')}
+  </tr></thead>`;
+  const tbody = `<tbody>${rows.map(r => `<tr>
+    <td class="checkbox-cell"><input type="checkbox" class="row-select" data-rowid="${escapeHtml(r._rowid)}" /></td>
+    ${displayCols.map(c => {
+      if (c === 'action') return `<td><button class="small-btn" data-edit-row="${escapeHtml(r._rowid)}" data-table="${escapeHtml(table)}">แก้ไข</button></td>`;
+      return `<td>${escapeHtml(r[c])}</td>`;
+    }).join('')}
+  </tr>`).join('')}</tbody>`;
   return `<table>${thead}${tbody}</table>`;
 }
 
@@ -1230,12 +1489,158 @@ function exportLastSqlCsv() {
   downloadText('sql_result.csv', rowsToCsv(state.lastSqlColumns, state.lastSqlRows), 'text/csv;charset=utf-8');
 }
 
+function exportLastSqlJson() {
+  if (!state.lastSqlColumns.length) return toast('ยังไม่มีผลลัพธ์ SQL ให้ Export', 'error');
+  downloadText('sql_result.json', JSON.stringify(state.lastSqlRows, null, 2), 'application/json;charset=utf-8');
+}
+
 function exportBrowserCsv() {
   const table = $('browserTable').value || state.tables[0];
   if (!table) return toast('ยังไม่มีตาราง', 'error');
   const cols = getColumns(table).map(c => c.name);
   const rows = query(`SELECT * FROM ${quoteIdent(table)};`).rows;
   downloadText(`${table}.csv`, rowsToCsv(cols, rows), 'text/csv;charset=utf-8');
+}
+
+function exportBrowserJson() {
+  const table = $('browserTable').value || state.tables[0];
+  if (!table) return toast('ยังไม่มีตาราง', 'error');
+  const rows = query(`SELECT * FROM ${quoteIdent(table)};`).rows;
+  downloadText(`${table}.json`, JSON.stringify(rows, null, 2), 'application/json;charset=utf-8');
+}
+
+function safeSpssVar(name) {
+  let v = String(name || 'var').trim().replace(/[^A-Za-z0-9_]/g, '_');
+  if (!/^[A-Za-z_]/.test(v)) v = 'v_' + v;
+  return v.slice(0, 64) || 'var_col';
+}
+
+function buildSpssSyntaxText() {
+  const tableSelect = $('browserTable');
+  const table = (tableSelect && tableSelect.value) || state.tables[0];
+  let fileHint = 'sample_sales.csv';
+  let varLines;
+
+  if (table) {
+    fileHint = `${table}.csv`;
+    const cols = getColumns(table);
+    varLines = cols.map(c => {
+      const t = String(c.type || '').toUpperCase();
+      const isNumeric = /INT|REAL|FLOA|DOUB|NUM|DEC/.test(t);
+      return `    ${safeSpssVar(c.name)} ${isNumeric ? 'F12.2' : 'A80'}`;
+    }).join('\n');
+  } else {
+    varLines = [
+      'order_id A20', 'order_date A10', 'customer_id A20', 'customer_name A80',
+      'product_id A20', 'category A40', 'product_name A80', 'region A40',
+      'channel A40', 'quantity F8.0', 'unit_price F12.2', 'discount F8.4',
+      'cost F12.2', 'order_status A30', 'gross_sales F12.2', 'discount_amount F12.2',
+      'net_sales F12.2', 'total_cost F12.2', 'profit F12.2'
+    ].map(l => `    ${l}`).join('\n');
+  }
+
+  return `* สร้างอัตโนมัติจาก Data Insight SQL Dashboard Pro.
+* 1) Export CSV ของตาราง "${table || 'sample_sales'}" จากแท็บ Table Browser หรือ SQL ก่อน แล้วนำไฟล์ไปวางในโฟลเดอร์เดียวกับที่เปิด SPSS หรือแก้ path ด้านล่างให้ตรงตำแหน่งไฟล์.
+GET DATA
+  /TYPE=TXT
+  /FILE='${fileHint}'
+  /ENCODING='UTF8'
+  /DELCASE=LINE
+  /DELIMITERS=","
+  /QUALIFIER='"'
+  /ARRANGEMENT=DELIMITED
+  /FIRSTCASE=2
+  /VARIABLES=
+${varLines}.
+EXECUTE.
+
+* 2) ดูภาพรวมเบื้องต้น (ปรับรายชื่อตัวแปรตามข้อมูลจริง).
+FREQUENCIES VARIABLES=ALL.
+DESCRIPTIVES VARIABLES=ALL /STATISTICS=MEAN STDDEV MIN MAX.
+`;
+}
+
+function downloadSpssSyntaxTemplate() {
+  downloadText('SPSS_Syntax_Template.sps', buildSpssSyntaxText(), 'text/plain;charset=utf-8');
+  toast('ดาวน์โหลด SPSS Syntax แล้ว', 'success');
+}
+
+function downloadSpssExcelTemplate() {
+  if (typeof XLSX === 'undefined') {
+    toast('โหลดไลบรารีสร้างไฟล์ Excel ไม่สำเร็จ ตรวจการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่', 'error');
+    return;
+  }
+  const dataRows = [
+    ['order_id', 'order_date', 'customer_id', 'customer_name', 'product_id', 'category', 'product_name', 'region', 'channel', 'quantity', 'unit_price', 'discount', 'cost', 'order_status'],
+    ['OD0001', '2026-01-05', 'C0001', 'ตัวอย่างลูกค้า 1', 'P0001', 'เครื่องดื่ม', 'ตัวอย่างสินค้า 1', 'กรุงเทพ', 'Online', 3, 120, 0.05, 80, 'Completed'],
+    ['OD0002', '2026-01-06', 'C0002', 'ตัวอย่างลูกค้า 2', 'P0002', 'ขนม', 'ตัวอย่างสินค้า 2', 'เชียงใหม่', 'Store', 1, 60, 0, 35, 'Completed'],
+    ['OD0003', '2026-01-07', 'C0001', 'ตัวอย่างลูกค้า 1', 'P0003', 'เครื่องดื่ม', 'ตัวอย่างสินค้า 3', 'กรุงเทพ', 'Online', 2, 90, 0.1, 55, 'Pending']
+  ];
+  const codebookRows = [
+    ['คอลัมน์', 'ความหมาย', 'Type ใน SPSS', 'Measure'],
+    ['order_id', 'รหัสคำสั่งซื้อ', 'String', 'Nominal'],
+    ['order_date', 'วันที่สั่งซื้อ', 'Date', 'Scale'],
+    ['customer_id', 'รหัสลูกค้า', 'String', 'Nominal'],
+    ['category', 'หมวดหมู่สินค้า', 'String', 'Nominal'],
+    ['region', 'ภูมิภาค', 'String', 'Nominal'],
+    ['channel', 'ช่องทางขาย', 'String', 'Nominal'],
+    ['quantity', 'จำนวนที่ซื้อ', 'Numeric', 'Scale'],
+    ['unit_price', 'ราคาต่อหน่วย', 'Numeric', 'Scale'],
+    ['discount', 'ส่วนลด (สัดส่วน 0-1)', 'Numeric', 'Scale'],
+    ['cost', 'ต้นทุนต่อหน่วย', 'Numeric', 'Scale'],
+    ['order_status', 'สถานะคำสั่งซื้อ', 'String', 'Nominal']
+  ];
+  const checklistRows = [
+    ['ข้อตรวจสอบก่อนวิเคราะห์ใน SPSS'],
+    ['หัวตารางไม่มีช่องว่างหรือสัญลักษณ์แปลก'],
+    ['คอลัมน์ตัวเลขตั้ง Type เป็น Numeric ไม่ใช่ String'],
+    ['ตัวแปรกลุ่ม (category, region, channel) ตั้ง Measure เป็น Nominal'],
+    ['แถวที่ข้อมูลผิดหรือว่างถูกทำเครื่องหมายหรือแก้ไขแล้วในเว็บนี้ก่อน Export']
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataRows), 'Data_for_SPSS');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(codebookRows), 'Codebook');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(checklistRows), 'Checklist');
+  XLSX.writeFile(wb, 'SPSS_Excel_Data_Entry_Template.xlsx');
+  toast('ดาวน์โหลด Excel Template แล้ว', 'success');
+}
+
+function downloadSpssExcelGuide() {
+  const text = `# คู่มือ Excel → SPSS สำหรับผู้เริ่มต้น
+
+## 1. เตรียมไฟล์ Excel
+- เปิดไฟล์ SPSS_Excel_Data_Entry_Template.xlsx (ดาวน์โหลดจากปุ่มถัดไป) หรือใช้ไฟล์ CSV ที่ Export จากเว็บนี้
+- ชีต Data_for_SPSS คือข้อมูลจริง 1 แถวต่อ 1 record, แถวแรกเป็นชื่อคอลัมน์
+- ชีต Codebook อธิบายความหมายแต่ละคอลัมน์และ Type/Measure ที่แนะนำ
+- ชีต Checklist ใช้ตรวจข้อมูลก่อนนำเข้า SPSS
+
+## 2. นำเข้า SPSS
+1. เปิด IBM SPSS Statistics
+2. ไปที่เมนู File > Import Data > Excel...
+3. เลือกไฟล์ Excel ที่เตรียมไว้
+4. เลือกชีต Data_for_SPSS
+5. ติ๊กเปิด "Read variable names from the first row of data"
+6. กด OK
+
+## 3. ตั้งค่า Variable View
+- ไปที่แท็บ Variable View (มุมล่างซ้ายของ SPSS)
+- ตั้งค่า Type ให้ตรงกับข้อมูล เช่น ตัวเลข = Numeric, ข้อความ = String, วันที่ = Date
+- ตั้งค่า Label เป็นคำอธิบายภาษาที่อ่านง่าย
+- ตั้งค่า Measure: ตัวเลขต่อเนื่อง = Scale, กลุ่ม/หมวดหมู่ = Nominal, อันดับ = Ordinal
+
+## 4. ตรวจสอบก่อนวิเคราะห์
+- ดูชีต Checklist ในไฟล์ Excel Template ประกอบ
+- ตรวจว่าไม่มีคอลัมน์ที่หัวตารางมีช่องว่างหรือสัญลักษณ์แปลก
+- ตรวจว่าค่าว่าง (missing) ถูกกำหนดใน Missing Values ให้เหมาะสม
+
+## 5. เลือกสถิติให้ตรงคำถาม
+- Analyze > Descriptive Statistics > Frequencies/Descriptives สำหรับภาพรวม
+- Analyze > Descriptive Statistics > Crosstabs สำหรับดูความสัมพันธ์ตัวแปรกลุ่ม
+- Analyze > Correlate / Regression สำหรับดูความสัมพันธ์เชิงตัวเลข
+`;
+  downloadText('SPSS_Excel_Import_Guide_TH.md', text, 'text/markdown;charset=utf-8');
+  toast('ดาวน์โหลดคู่มือแล้ว', 'success');
 }
 
 function generateMysqlSql() {

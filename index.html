@@ -7,6 +7,13 @@
   <meta name="description" content="SQL, SQLite, MySQL, Tableau and Power BI data analytics dashboard web app" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/sql-hint.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script type="module" src="https://public.tableau.com/javascripts/api/tableau.embedding.3.latest.min.js"></script>
 </head>
@@ -349,9 +356,9 @@
               <h2>SQL Editor สำหรับผู้ที่อยากวิเคราะห์ลึกขึ้น</h2>
               <p>ไม่จำเป็นต้องใช้หน้านี้ก็วิเคราะห์ได้ แต่ถ้าต้องการถามข้อมูลเฉพาะเจาะจง ให้เริ่มจากปุ่มตัวอย่างด้านล่างก่อน</p>
             </div>
-            <div class="button-row"><button id="btnRunSql" class="primary">Run SQL</button><button id="btnExportSqlCsv">Export Result CSV</button></div>
+            <div class="button-row"><button id="btnRunSql" class="primary">Run SQL</button><button id="btnExportSqlCsv">Export Result CSV</button><button id="btnExportSqlJson">Export Result JSON</button></div>
           </div>
-          <label>เขียนคำสั่ง SQL หรือกดปุ่มตัวอย่างด้านล่าง</label>
+          <label>เขียนคำสั่ง SQL หรือกดปุ่มตัวอย่างด้านล่าง (Ctrl+Enter รัน, Ctrl+Space autocomplete ชื่อตาราง/คอลัมน์)</label>
           <textarea id="sqlInput" spellcheck="false">SELECT * FROM sales_data LIMIT 20;</textarea>
           <div class="button-row template-row">
             <button class="sql-template" data-sql="SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;">ดูรายชื่อตาราง</button>
@@ -375,16 +382,49 @@
         <div class="panel hero-panel">
           <div>
             <h2>ดูข้อมูลในตาราง</h2>
-            <p>ดูข้อมูลจริง ค้นหา และดาวน์โหลดเป็น CSV เหมือนดู spreadsheet เบื้องต้น</p>
+            <p>ดูข้อมูลจริง ค้นหา จัดเรียง แบ่งหน้า ลบหลายแถว และดาวน์โหลดเป็น CSV/JSON เหมือนดู spreadsheet เบื้องต้น</p>
           </div>
-          <button id="btnExportTableCsv">Export Table CSV</button>
+          <div class="button-row">
+            <button id="btnExportTableCsv">Export Table CSV</button>
+            <button id="btnExportTableJson">Export Table JSON</button>
+          </div>
         </div>
         <div class="controls-grid panel">
           <label>ตาราง <select id="browserTable"></select></label>
           <label>ค้นหา <input id="browserSearch" type="search" placeholder="ค้นหาทุกคอลัมน์" /></label>
-          <label>จำนวนแถว <select id="browserLimit"><option>25</option><option>50</option><option selected>100</option><option>250</option><option>500</option></select></label>
+          <label>แถวต่อหน้า <select id="browserLimit"><option>25</option><option selected>50</option><option>100</option><option>250</option><option>500</option><option>1000</option></select></label>
+        </div>
+        <div class="panel">
+          <div class="section-head compact">
+            <div class="button-row">
+              <button id="btnDropTable" class="small-btn">ลบตาราง (Drop)</button>
+              <button id="btnTruncateTable" class="small-btn">ล้างข้อมูลทั้งหมด (Truncate)</button>
+              <button id="btnDeleteSelectedRows" class="small-btn">ลบแถวที่เลือก</button>
+            </div>
+            <div id="browserPageInfo" class="small"></div>
+          </div>
         </div>
         <div class="panel"><div id="browserResult" class="table-wrap"></div></div>
+        <div class="panel">
+          <div class="button-row">
+            <button id="btnBrowserPrev" class="small-btn">← หน้าก่อนหน้า</button>
+            <button id="btnBrowserNext" class="small-btn">หน้าถัดไป →</button>
+          </div>
+        </div>
+
+        <div class="panel edit-panel">
+          <div class="section-head compact">
+            <h3>สร้างตารางใหม่ (Create Table Wizard)</h3>
+            <button id="btnAddWizardColumn" class="small-btn">+ เพิ่มคอลัมน์</button>
+          </div>
+          <label>ชื่อตาราง <input id="wizardTableName" type="text" placeholder="เช่น new_table" /></label>
+          <div id="wizardColumns" class="table-list"></div>
+          <label>SQL ที่จะสร้าง</label>
+          <pre id="wizardSqlPreview" class="code-box small"></pre>
+          <div class="button-row">
+            <button id="btnCreateWizardTable" class="primary">สร้างตาราง</button>
+          </div>
+        </div>
       </section>
 
       <section id="mysql" class="tab-panel">
@@ -508,7 +548,7 @@ in
             <h2>SPSS Helper สำหรับผู้เริ่มต้น</h2>
             <p>ส่วนนี้ช่วยให้ผู้ใช้ที่ไม่เคยใช้ SPSS เข้าใจตั้งแต่การเตรียมไฟล์ CSV/Excel, Data View, Variable View, การกำหนดชนิดตัวแปร, การตรวจข้อมูล และการเลือกสถิติให้ตรงคำถาม</p>
           </div>
-          <a class="button-link primary" href="./docs/SPSS_SYNTAX_TEMPLATES.sps" download>ดาวน์โหลด SPSS Syntax</a>
+          <button type="button" class="button-link primary" onclick="downloadSpssSyntaxTemplate()">ดาวน์โหลด SPSS Syntax</button>
         </div>
 
         <div class="quick-start-grid">
@@ -535,8 +575,8 @@ in
             <p>เพิ่มไฟล์ตัวอย่าง Excel พร้อม Codebook และ Checklist เพื่อให้ผู้ใช้เห็นโครงสร้างตารางที่เหมาะกับ SPSS ก่อนนำเข้าข้อมูลจริง</p>
           </div>
           <div class="button-row">
-            <a class="button-link primary" href="./docs/spss_excel_data_entry_template.xlsx" download>ดาวน์โหลด Excel Template</a>
-            <a class="button-link" href="./docs/SPSS_EXCEL_IMPORT_GUIDE_TH.md" download>ดาวน์โหลดคู่มือ Excel → SPSS</a>
+            <button type="button" class="button-link primary" onclick="downloadSpssExcelTemplate()">ดาวน์โหลด Excel Template</button>
+            <button type="button" class="button-link" onclick="downloadSpssExcelGuide()">ดาวน์โหลดคู่มือ Excel → SPSS</button>
           </div>
         </div>
 
@@ -655,12 +695,10 @@ DESCRIPTIVES VARIABLES=net_sales profit quantity discount /STATISTICS=MEAN STDDE
 
         <div class="panel guide">
           <h3>เอกสาร SPSS ที่เพิ่มในโปรเจกต์</h3>
+          <p class="small">ปุ่ม "ดาวน์โหลด SPSS Syntax", "ดาวน์โหลด Excel Template" และ "ดาวน์โหลดคู่มือ Excel → SPSS" ด้านบนสร้างไฟล์ขึ้นในเบราว์เซอร์ทันที (ไม่ต้องพึ่งไฟล์ในโฟลเดอร์ docs) จึงใช้งานได้จริงแม้ deploy บน GitHub Pages ส่วนเอกสารเสริมด้านล่างนี้ (ถ้ามีอยู่ในโฟลเดอร์ <code>docs/</code> ของ repo คุณ) เป็นข้อมูลอ่านเพิ่มเติม:</p>
           <ul>
             <li><code>docs/SPSS_GUIDE_TH.md</code> — คู่มือ SPSS ภาษาไทยสำหรับผู้เริ่มต้นแบบละเอียด</li>
-            <li><code>docs/SPSS_EXCEL_IMPORT_GUIDE_TH.md</code> — คู่มือใส่ข้อมูลจาก Excel และ Import เข้า SPSS แบบละเอียด</li>
             <li><code>docs/SPSS_YOUTUBE_LEARNING_NOTES_TH.md</code> — บันทึกหัวข้อจาก YouTube สำหรับเรียน SPSS มือใหม่</li>
-            <li><code>docs/spss_excel_data_entry_template.xlsx</code> — Excel Template พร้อม Data, Codebook และ Checklist</li>
-            <li><code>docs/SPSS_SYNTAX_TEMPLATES.sps</code> — Syntax Template สำหรับเปิด CSV และวิเคราะห์ข้อมูลตัวอย่าง</li>
             <li><code>docs/SPSS_VARIABLE_SETUP.md</code> — ตารางแนะนำการตั้งค่า Variable View</li>
           </ul>
         </div>
