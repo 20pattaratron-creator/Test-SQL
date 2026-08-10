@@ -303,3 +303,19 @@ select:hover,input[type="text"]:hover{border-color:color-mix(in srgb,var(--accen
 @media(max-width:720px){
   .guide-section{padding:14px}.guide-heading{align-items:flex-start;flex-direction:column}.method-info-head{align-items:flex-start;flex-direction:column}
 }
+
+/* ===== Boot loader overlay ===== */
+.boot-loader{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:var(--bg);transition:opacity .25s ease,visibility .25s ease}
+.boot-loader.hidden{opacity:0;visibility:hidden;pointer-events:none}
+.boot-card{text-align:center;max-width:360px;padding:32px 28px;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+.boot-mark{width:48px;height:48px;border-radius:12px;background:var(--accent);color:#fff;font-weight:800;font-size:18px;display:grid;place-items:center;margin:0 auto 14px}
+.boot-title{font-weight:750;font-size:16px;margin-bottom:18px}
+.boot-spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);margin:0 auto 16px;animation:boot-spin .8s linear infinite}
+@keyframes boot-spin{to{transform:rotate(360deg)}}
+.boot-message{color:var(--muted);font-size:12.5px;line-height:1.6}
+.boot-actions{margin-top:16px;border-top:1px solid var(--line);padding-top:16px}
+.boot-hint{color:var(--muted);font-size:11.5px;line-height:1.6;margin:0 0 12px}
+.boot-actions .btn{width:100%}
+.error-banner{position:fixed;left:50%;bottom:calc(var(--statusbar) + 14px);transform:translateX(-50%);z-index:95;background:var(--danger);color:#fff;padding:10px 16px;border-radius:9px;font-size:12.5px;box-shadow:var(--shadow);max-width:min(520px,90vw);text-align:center}
+.spss-table tr.sig-row{background:color-mix(in srgb,var(--accent-soft) 55%,transparent)}
+.spss-table tr.sig-row td:first-child{font-weight:700;color:var(--accent)}

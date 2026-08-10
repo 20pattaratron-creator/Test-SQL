@@ -1,7 +1,8 @@
 import {
   mean, median, sampleVariance as variance, sampleStdDev as stdev, standardError,
   adjustedFisherPearsonSkewness as skewness, correlationTest, simpleLinearRegression,
-  independentTTest, pairedTTest, chiSquareIndependence, oneWayAnova, studentTInv
+  independentTTest, pairedTTest, chiSquareIndependence, oneWayAnova, studentTInv,
+  leveneTest, pairwisePostHoc
 } from './statistics.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -119,27 +120,166 @@ function toast(message) {
   toast.timer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
+// ===== IndexedDB persistence: auto-save the working database + dashboard so a
+// refresh or accidental tab close does not lose the user's work. =====
+const IDB_NAME = 'das-workspace';
+const IDB_STORE = 'kv';
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) { reject(new Error('IndexedDB unavailable')); return; }
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbSet(key, value) {
+  const db = await idbOpen();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(value, key);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+async function idbGet(key) {
+  const db = await idbOpen();
+  const value = await new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return value;
+}
+async function idbClear() {
+  const db = await idbOpen();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).clear();
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
+let autosaveTimer = null;
+function scheduleAutosave() {
+  if (!state.db) return;
+  clearTimeout(autosaveTimer);
+  const el = $('#autosaveStatus');
+  if (el) el.textContent = 'กำลังบันทึก... / Saving...';
+  autosaveTimer = setTimeout(saveWorkspace, 700);
+}
+async function saveWorkspace() {
+  if (!state.db) return;
+  try {
+    const binary = state.db.export();
+    await idbSet('database', binary);
+    await idbSet('meta', {
+      fileName: state.fileName,
+      currentTable: state.currentTable,
+      dashboardCharts: state.dashboardCharts,
+    });
+    const el = $('#autosaveStatus');
+    if (el) el.textContent = `บันทึกอัตโนมัติแล้ว ${new Date().toLocaleTimeString('th-TH')} / Auto-saved`;
+  } catch (err) {
+    console.warn('Autosave failed', err);
+    const el = $('#autosaveStatus');
+    if (el) el.textContent = 'บันทึกอัตโนมัติไม่สำเร็จ / Auto-save failed';
+  }
+}
+async function restoreWorkspace() {
+  try {
+    const binary = await idbGet('database');
+    if (!binary) return false;
+    const meta = (await idbGet('meta')) || {};
+    state.db?.close();
+    state.db = new state.SQL.Database(new Uint8Array(binary));
+    state.fileName = meta.fileName || 'Browser Data Workbench';
+    state.dashboardCharts = Array.isArray(meta.dashboardCharts) ? meta.dashboardCharts : [];
+    await refreshDatabaseUI(meta.currentTable || null);
+    const el = $('#autosaveStatus');
+    if (el) el.textContent = 'กู้คืนข้อมูลจากครั้งก่อนแล้ว / Restored your last session';
+    return true;
+  } catch (err) {
+    console.warn('Restore failed', err);
+    return false;
+  }
+}
+async function clearWorkspaceStorage() {
+  try { await idbClear(); } catch (err) { console.warn('Clear storage failed', err); }
+}
+
 function setStatus(message) { $('#statusText').textContent = message; }
 function safeId(name) { return `"${String(name).replaceAll('"', '""')}"`; }
 function fmt(n, digits = 2) { return Number.isFinite(n) ? n.toLocaleString('th-TH', { maximumFractionDigits: digits }) : '—'; }
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 function downloadBlob(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
 
+function setBootMessage(msg) { const el = $('#bootMessage'); if (el) el.textContent = msg; }
+
+function hideBootLoader() {
+  const el = $('#bootLoader');
+  if (!el) return;
+  el.classList.add('hidden');
+  setTimeout(() => el.remove(), 400);
+}
+
+function showBootRetry(msg) {
+  setBootMessage(msg);
+  const actions = $('#bootActions');
+  if (actions) actions.hidden = false;
+}
+
+function timeoutAfter(ms, message) {
+  return new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms));
+}
+
 async function init() {
+  const bootRetryBtn = $('#bootRetryBtn');
+  bootRetryBtn?.addEventListener('click', () => window.location.reload());
+
+  let eventsAlreadyBound = false;
   try {
-    state.SQL = await initSqlJs({ locateFile: file => `https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/${file}` });
+    if (typeof initSqlJs !== 'function' || !window.XLSX || !window.Chart) {
+      throw new Error('CDN library not loaded');
+    }
+    setBootMessage('กำลังเริ่มต้น SQLite engine... / Starting SQLite engine...');
+    state.SQL = await Promise.race([
+      initSqlJs({ locateFile: file => `https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/${file}` }),
+      timeoutAfter(20000, 'SQLite engine timed out'),
+    ]);
     state.db = new state.SQL.Database();
     $('#engineStatus').textContent = 'SQLite พร้อมใช้งาน';
     setStatus('SQLite engine ready');
     bindEvents();
-    await loadSampleData(false);
+    eventsAlreadyBound = true;
+    setBootMessage('กำลังกู้คืนข้อมูลครั้งก่อน... / Checking for a saved session...');
+    const restored = await restoreWorkspace();
+    if (!restored) {
+      setBootMessage('กำลังเตรียมข้อมูลตัวอย่าง... / Preparing sample data...');
+      await loadSampleData(false);
+    }
+    hideBootLoader();
   } catch (err) {
     console.error(err);
     $('#engineStatus').textContent = 'โหลด SQLite ไม่สำเร็จ';
     setStatus('SQLite engine error');
-    bindEvents();
+    if (!eventsAlreadyBound) bindEvents();
+    showBootRetry('โหลดเครื่องมือไม่สำเร็จ อาจเกิดจากอินเทอร์เน็ตหรือตัวบล็อกโฆษณา / Failed to load required libraries — check your connection or disable ad blockers, then retry.');
   }
 }
+
+window.addEventListener('error', (e) => {
+  console.error(e.error || e.message);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  console.error(e.reason);
+});
 
 function bindEvents() {
   $$('.nav-item').forEach(btn => btn.addEventListener('click', () => switchView(btn.dataset.view)));
@@ -161,7 +301,13 @@ function bindEvents() {
   $$('.analysis-item').forEach(btn => btn.addEventListener('click', () => { state.activeAnalysis = btn.dataset.analysis; $$('.analysis-item').forEach(x => x.classList.remove('active')); btn.classList.add('active'); renderAnalysisControls(); }));
   $('#buildChartBtn').addEventListener('click', buildChart);
   $('#addDashboardBtn').addEventListener('click', addChartToDashboard);
-  $('#resetDashboardBtn').addEventListener('click', () => { state.dashboardCharts = []; renderDashboard(); });
+  $('#resetDashboardBtn').addEventListener('click', () => {
+    if (!state.dashboardCharts.length) return;
+    if (!confirm('ล้างกราฟทั้งหมดใน Dashboard?\nClear all charts from the Dashboard? This cannot be undone.')) return;
+    state.dashboardCharts = [];
+    renderDashboard();
+    scheduleAutosave();
+  });
   $$('.quick-card').forEach(btn => btn.addEventListener('click', () => {
     const a = btn.dataset.action;
     if (a === 'open-file') $('#fileInput').click();
@@ -203,10 +349,15 @@ function toggleTheme() {
 
 function createNewDatabase() {
   if (!state.SQL) return toast('SQLite engine ยังไม่พร้อม');
+  if (state.totalRows > 0 || getTableNames().length > 0) {
+    const ok = confirm('สร้างฐานข้อมูลใหม่จะลบข้อมูลปัจจุบันทั้งหมด (รวมถึงข้อมูลที่บันทึกอัตโนมัติไว้)\nCreate a new database? This clears all current data, including the auto-saved copy. This cannot be undone.');
+    if (!ok) return;
+  }
   state.db?.close();
   state.db = new state.SQL.Database();
   state.fileName = 'new-database.sqlite';
   state.currentTable = null; state.rows = []; state.columns = []; state.schema = []; state.totalRows = 0;
+  state.dashboardCharts = [];
   refreshDatabaseUI();
   toast('สร้างฐานข้อมูลใหม่แล้ว');
 }
@@ -354,6 +505,7 @@ async function refreshDatabaseUI(preferredTable = null) {
   $('#fileNameLabel').textContent = state.fileName;
   if (state.currentTable) loadCurrentTable();
   else { state.rows=[];state.columns=[];state.schema=[];state.totalRows=0;renderAll(); }
+  scheduleAutosave();
 }
 
 function renderTableList() {
@@ -761,17 +913,30 @@ function outputIndependentT(testVar, groupVar, group1, group2) {
   const g2 = state.rows.filter(r => !isMissing(r[groupVar]) && String(r[groupVar]) === String(group2)).map(r => r[testVar]);
   const m = independentTTest(g1, g2);
   const se1 = m.sd1 / Math.sqrt(m.n1), se2 = m.sd2 / Math.sqrt(m.n2);
+  let leveneRow = '';
+  try {
+    const lev = leveneTest([{ label: group1, values: g1 }, { label: group2, values: g2 }]);
+    const verdict = lev.p < 0.05
+      ? 'Variances differ significantly — prefer the Welch row above / ความแปรปรวนต่างกันอย่างมีนัยสำคัญ ควรใช้แถว Welch'
+      : 'No evidence variances differ — pooled row is also reasonable / ยังไม่มีหลักฐานว่าความแปรปรวนต่างกัน ใช้แถว Pooled ได้เช่นกัน';
+    leveneRow = `<div class="output-block"><h3>Levene's Test for Equality of Variances / ทดสอบความเท่ากันของความแปรปรวน</h3>
+      <table class="spss-table"><thead><tr><th>F</th><th>df1</th><th>df2</th><th>Sig.</th></tr></thead><tbody>
+      <tr><td>${fmt(lev.statistic,4)}</td><td>${lev.dfBetween}</td><td>${lev.dfWithin}</td><td>${fmtP(lev.p)}</td></tr>
+      </tbody></table><div class="caption">Brown\u2013Forsythe variant (deviations from group median) / ใช้ตัวแปรผันจากมัธยฐานของแต่ละกลุ่ม</div>
+      <div class="insight-box">${verdict}</div></div>`;
+  } catch { /* skip if not computable */ }
   return `${outputHeader('independentT')}
     <div class="output-block"><h3>Group Statistics / สถิติรายกลุ่ม</h3><table class="spss-table"><thead><tr><th>${escapeHtml(groupVar)}</th><th>N</th><th>Mean</th><th>Std. Deviation</th><th>Std. Error Mean</th></tr></thead><tbody>
       <tr><td>${escapeHtml(group1)}</td><td>${m.n1}</td><td>${fmt(m.mean1,5)}</td><td>${fmt(m.sd1,5)}</td><td>${fmt(se1,5)}</td></tr>
       <tr><td>${escapeHtml(group2)}</td><td>${m.n2}</td><td>${fmt(m.mean2,5)}</td><td>${fmt(m.sd2,5)}</td><td>${fmt(se2,5)}</td></tr>
     </tbody></table></div>
+    ${leveneRow}
     <div class="output-block"><h3>Independent Samples Test / การทดสอบสองกลุ่มอิสระ</h3><div class="caption">Mean Difference = Group 1 − Group 2 / ผลต่างเฉลี่ย = กลุ่ม 1 − กลุ่ม 2</div><div class="data-table-wrap"><table class="spss-table"><thead><tr><th>Variance assumption</th><th>t</th><th>df</th><th>Sig. (2-tailed)</th><th>Mean Difference</th><th>Std. Error Difference</th><th>95% CI Difference</th></tr></thead><tbody>
       <tr><td>Welch · Equal variances not assumed / ไม่สมมติความแปรปรวนเท่ากัน</td><td>${fmt(m.welch.t,5)}</td><td>${fmt(m.welch.df,4)}</td><td>${fmtP(m.welch.p)}</td><td>${fmt(m.diff,5)}</td><td>${fmt(m.welch.se,5)}</td><td>[${fmt(m.welch.ci[0],5)}, ${fmt(m.welch.ci[1],5)}]</td></tr>
       <tr><td>Pooled · Equal variances assumed / สมมติความแปรปรวนเท่ากัน</td><td>${fmt(m.pooled.t,5)}</td><td>${m.pooled.df}</td><td>${fmtP(m.pooled.p)}</td><td>${fmt(m.diff,5)}</td><td>${fmt(m.pooled.se,5)}</td><td>[${fmt(m.pooled.ci[0],5)}, ${fmt(m.pooled.ci[1],5)}]</td></tr>
     </tbody></table></div>
     <div class="insight-box"><b>Welch inference / ผลแบบ Welch:</b> ${decisionText(m.welch.p)}<br><b>Effect size / ขนาดอิทธิพล:</b> Cohen's d = ${fmt(m.cohenD,4)}, Hedges' g = ${fmt(m.hedgesG,4)}</div>
-    <div class="method-warning">This implementation reports both Welch and pooled results instead of silently choosing an equal-variance assumption. It does not currently run Levene's test / โปรแกรมรายงานทั้งสองวิธีและยังไม่ได้ทำ Levene's test อัตโนมัติ</div></div>`;
+    <div class="method-warning">This implementation reports both Welch and pooled results instead of silently choosing an equal-variance assumption / โปรแกรมรายงานทั้งสองวิธีแทนที่จะสมมติความแปรปรวนเท่ากันไว้ก่อน</div></div>`;
 }
 
 function outputPairedT(xc, yc) {
@@ -826,15 +991,41 @@ function outputAnova(dependent, factor) {
   const entries = [...groupsMap.entries()].sort((a,b) => naturalCompare(a[0], b[0])).map(([label, values]) => ({ label, values }));
   const m = oneWayAnova(entries);
   const desc = m.summaries.map(g => `<tr><td>${escapeHtml(g.label)}</td><td>${g.n}</td><td>${fmt(g.mean,5)}</td><td>${fmt(g.sd,5)}</td></tr>`).join('');
+
+  let leveneRow = '';
+  try {
+    const lev = leveneTest(entries);
+    leveneRow = `<div class="output-block"><h3>Levene's Test for Equality of Variances / ทดสอบความเท่ากันของความแปรปรวน</h3>
+      <table class="spss-table"><thead><tr><th>F</th><th>df1</th><th>df2</th><th>Sig.</th></tr></thead><tbody>
+      <tr><td>${fmt(lev.statistic,4)}</td><td>${lev.dfBetween}</td><td>${lev.dfWithin}</td><td>${fmtP(lev.p)}</td></tr>
+      </tbody></table><div class="caption">Brown\u2013Forsythe variant (deviations from group median). ANOVA is fairly robust to mild violations with similar group sizes / ANOVA ทนต่อการละเมิดเล็กน้อยได้พอสมควรหากขนาดกลุ่มใกล้เคียงกัน</div></div>`;
+  } catch { /* skip */ }
+
+  let postHoc = '';
+  if (m.p < 0.05 && entries.length >= 2 && entries.length <= 12) {
+    try {
+      const ph = pairwisePostHoc(entries);
+      const rows = ph.comparisons.map(c => `<tr class="${c.significant ? 'sig-row' : ''}"><td>${escapeHtml(c.a)} vs ${escapeHtml(c.b)}</td><td>${fmt(c.meanDiff,5)}</td><td>${fmt(c.t,4)}</td><td>${fmt(c.df,2)}</td><td>${fmtP(c.p)}</td><td>${fmtP(c.pAdjusted)}</td><td>${c.significant ? 'Yes / ใช่' : 'No / ไม่'}</td></tr>`).join('');
+      postHoc = `<div class="output-block"><h3>Post-Hoc Pairwise Comparisons / การเปรียบเทียบรายคู่หลัง ANOVA</h3>
+        <div class="caption">${ph.method} · ${ph.m} comparisons / การเปรียบเทียบ · α = 0.05</div>
+        <div class="data-table-wrap"><table class="spss-table"><thead><tr><th>Pair / คู่กลุ่ม</th><th>Mean Diff.</th><th>t</th><th>df</th><th>Sig.</th><th>Sig. (Bonferroni)</th><th>Significant?</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <div class="method-warning">Bonferroni correction controls the family-wise error rate but is conservative with many groups; treat borderline pairs cautiously / การแก้ไข Bonferroni ควบคุมอัตราความผิดพลาดรวมแต่อาจเข้มงวดเกินไปเมื่อมีหลายกลุ่ม</div></div>`;
+    } catch { /* skip if not computable */ }
+  } else if (m.p < 0.05 && entries.length > 12) {
+    postHoc = `<div class="method-warning">Factor has more than 12 groups — post-hoc pairwise comparisons are skipped to avoid an unreadable table with too many comparisons / มีมากกว่า 12 กลุ่ม จึงข้ามการเปรียบเทียบรายคู่เพื่อไม่ให้ตารางอ่านยากเกินไป</div>`;
+  }
+
   return `${outputHeader('anova')}
     <div class="output-block"><h3>Descriptives by Group / สถิติแยกตามกลุ่ม</h3><table class="spss-table"><thead><tr><th>${escapeHtml(factor)}</th><th>N</th><th>Mean</th><th>Std. Deviation</th></tr></thead><tbody>${desc}</tbody></table></div>
+    ${leveneRow}
     <div class="output-block"><h3>ANOVA / การวิเคราะห์ความแปรปรวน</h3><table class="spss-table"><thead><tr><th>Source</th><th>Sum of Squares</th><th>df</th><th>Mean Square</th><th>F</th><th>Sig.</th></tr></thead><tbody>
       <tr><td>Between Groups</td><td>${fmt(m.ssBetween,5)}</td><td>${m.dfBetween}</td><td>${fmt(m.msBetween,5)}</td><td>${fmt(m.f,5)}</td><td>${fmtP(m.p)}</td></tr>
       <tr><td>Within Groups</td><td>${fmt(m.ssWithin,5)}</td><td>${m.dfWithin}</td><td>${fmt(m.msWithin,5)}</td><td>—</td><td>—</td></tr>
       <tr><td>Total</td><td>${fmt(m.ssTotal,5)}</td><td>${m.n-1}</td><td>—</td><td>—</td><td>—</td></tr>
     </tbody></table>
     <div class="insight-box">${decisionText(m.p)}<br><b>Effect sizes / ขนาดอิทธิพล:</b> η² = ${fmt(m.etaSquared,4)}, ω² = ${fmt(m.omegaSquared,4)}</div>
-    <div class="method-warning">A significant omnibus ANOVA shows that not all group means are equal; it does not identify which pairs differ. Use an appropriate post-hoc procedure for pairwise conclusions / ANOVA ที่มีนัยสำคัญบอกเพียงว่าค่าเฉลี่ยบางกลุ่มต่างกัน ยังต้องใช้ post-hoc เพื่อระบุคู่ที่ต่าง</div></div>`;
+    <div class="method-warning">A significant omnibus ANOVA shows that not all group means are equal; it does not identify which pairs differ. See the post-hoc table below for pairwise conclusions / ANOVA ที่มีนัยสำคัญบอกเพียงว่าค่าเฉลี่ยบางกลุ่มต่างกัน ดูตาราง post-hoc ด้านล่างเพื่อระบุคู่ที่ต่าง</div></div>
+    ${postHoc}`;
 }
 
 function renderGuide() {
@@ -866,7 +1057,7 @@ function populateChartSelectors(){const x=$('#chartX'),y=$('#chartY');if(!x||!y)
 function aggregateForChart(xCol,yCol,agg,type){if(type==='scatter'){return state.rows.map(r=>({x:Number(r[xCol]),y:Number(r[yCol])})).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)).slice(0,1000)}const groups=new Map();for(const r of state.rows){const k=String(r[xCol]??'(Missing)');if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r[yCol])}const labels=[...groups.keys()].slice(0,50);const data=labels.map(k=>{const vals=groups.get(k).filter(v=>v!==null&&v!==''&&!Number.isNaN(Number(v))).map(Number);if(agg==='count')return groups.get(k).length;if(!vals.length)return 0;return agg==='avg'?mean(vals):vals.reduce((s,v)=>s+v,0)});return{labels,data}}
 function chartConfig(){const type=$('#chartType').value,xCol=$('#chartX').value,yCol=$('#chartY').value,agg=$('#chartAgg').value;if(!xCol||!yCol)throw new Error('เลือกตัวแปรก่อน');if(type==='scatter'){const pts=aggregateForChart(xCol,yCol,agg,type);return{type:'scatter',data:{datasets:[{label:`${yCol} vs ${xCol}`,data:pts}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{display:true,text:xCol}},y:{title:{display:true,text:yCol}}}}}}const g=aggregateForChart(xCol,yCol,agg,type);return{type,data:{labels:g.labels,datasets:[{label:`${agg.toUpperCase()} ${yCol} by ${xCol}`,data:g.data,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false}}}
 function buildChart(){try{if(!window.Chart)throw new Error('Chart.js ยังไม่พร้อม');const cfg=chartConfig();state.chart?.destroy();$('#chartPlaceholder').style.display='none';state.chart=new Chart($('#chartCanvas'),cfg);toast('สร้างกราฟแล้ว')}catch(err){toast(err.message)}}
-function addChartToDashboard(){try{const cfg=chartConfig();state.dashboardCharts.push(JSON.parse(JSON.stringify(cfg)));if(state.dashboardCharts.length>6)state.dashboardCharts.shift();renderDashboard();toast('เพิ่มกราฟลง Dashboard แล้ว')}catch(err){toast(err.message)}}
+function addChartToDashboard(){try{const cfg=chartConfig();state.dashboardCharts.push(JSON.parse(JSON.stringify(cfg)));if(state.dashboardCharts.length>6)state.dashboardCharts.shift();renderDashboard();scheduleAutosave();toast('เพิ่มกราฟลง Dashboard แล้ว')}catch(err){toast(err.message)}}
 function renderDashboard(){renderMetrics();const wrap=$('#dashboardCharts');if(!state.dashboardCharts.length){wrap.innerHTML='<div class="panel empty-state">ยังไม่มีกราฟใน Dashboard — สร้างจาก Chart Builder แล้วกด Add to Dashboard</div>';return}wrap.innerHTML=state.dashboardCharts.map((_,i)=>`<article class="panel dash-chart-card"><canvas id="dashChart${i}"></canvas></article>`).join('');requestAnimationFrame(()=>state.dashboardCharts.forEach((cfg,i)=>new Chart($(`#dashChart${i}`),cfg)))}
 
 init();

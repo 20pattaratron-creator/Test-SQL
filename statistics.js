@@ -439,3 +439,50 @@ export function oneWayAnova(groupEntries) {
   const omegaSquared = ssTotal + msWithin > EPS ? (ssBetween - dfBetween * msWithin) / (ssTotal + msWithin) : NaN;
   return { n, k, grandMean, summaries, ssBetween, ssWithin, ssTotal, dfBetween, dfWithin, msBetween, msWithin, f, p, etaSquared, omegaSquared };
 }
+
+/**
+ * Levene's test for equality of variances (Brown–Forsythe variant: deviations
+ * from each group's MEDIAN, which is more robust to non-normal data than the
+ * classic mean-based Levene test). Implemented as a one-way ANOVA on the
+ * absolute deviations.
+ * Reference: NIST e-Handbook, Levene's Test — https://www.itl.nist.gov/div898/handbook/eda/section3/eda35a.htm
+ */
+export function leveneTest(groupEntries) {
+  const groups = groupEntries
+    .map(g => ({ label: g.label, values: cleanNumeric(g.values) }))
+    .filter(g => g.values.length > 0);
+  if (groups.length < 2) throw new Error('Levene\u2019s test needs at least 2 non-empty groups.');
+  const deviationGroups = groups.map(g => {
+    const med = median(g.values);
+    return { label: g.label, values: g.values.map(v => Math.abs(v - med)) };
+  });
+  const anova = oneWayAnova(deviationGroups);
+  return { statistic: anova.f, dfBetween: anova.dfBetween, dfWithin: anova.dfWithin, p: anova.p };
+}
+
+/**
+ * Pairwise post-hoc comparisons following a significant one-way ANOVA.
+ * Uses Welch (unequal-variance) t-tests for every group pair with a
+ * Bonferroni correction for the number of comparisons. This is a simpler
+ * and more robust alternative to Tukey HSD (which requires the studentized
+ * range distribution) and does not assume equal group variances.
+ */
+export function pairwisePostHoc(groupEntries, alpha = 0.05) {
+  const groups = groupEntries
+    .map(g => ({ label: g.label, values: cleanNumeric(g.values) }))
+    .filter(g => g.values.length >= 2);
+  const comparisons = [];
+  const m = (groups.length * (groups.length - 1)) / 2;
+  for (let i = 0; i < groups.length; i++) {
+    for (let j = i + 1; j < groups.length; j++) {
+      const test = independentTTest(groups[i].values, groups[j].values, alpha);
+      const pAdj = Math.min(1, test.welch.p * m);
+      comparisons.push({
+        a: groups[i].label, b: groups[j].label,
+        meanDiff: test.diff, t: test.welch.t, df: test.welch.df,
+        p: test.welch.p, pAdjusted: pAdj, significant: pAdj < alpha,
+      });
+    }
+  }
+  return { comparisons, method: 'Pairwise Welch t-tests, Bonferroni-adjusted', m };
+}

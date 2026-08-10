@@ -95,14 +95,32 @@ All statistical core tests passed.
 ```text
 data-analytics-studio/
 ├── index.html
+├── 404.html
+├── manifest.json
+├── favicon.svg
 ├── styles.css
 ├── app.js
 ├── statistics.js
-├── statistics.test.mjs
+├── statistics_test.mjs
 ├── FORMULA_REFERENCES.md
 ├── README.md
 └── THIRD_PARTY_NOTICES.md
 ```
+
+## New in this update / อัปเดตล่าสุด
+
+- **Auto-save (IndexedDB)**: the working SQLite database and dashboard charts are saved to the browser's IndexedDB automatically after every change, and restored the next time you open the app — refreshing the page or closing the tab no longer loses your work.
+- **Confirm before destructive actions**: "New Database" and "Reset Dashboard" now ask for confirmation before clearing data.
+- **Levene's Test** (Brown–Forsythe, median-based) is now reported alongside the Independent-Samples t Test and the One-Way ANOVA to check the equal-variance assumption.
+- **Post-hoc pairwise comparisons** are now reported automatically after a significant One-Way ANOVA (pairwise Welch t-tests with Bonferroni correction — chosen over Tukey HSD because it does not require assuming equal variances and needs no studentized-range approximation).
+
+## Production Readiness Notes / บันทึกความพร้อมใช้งาน
+
+- A full-screen boot loader shows load progress and automatically hides once the SQLite engine and sample data are ready.
+- If the CDN libraries (sql.js, SheetJS, Chart.js) fail to load — e.g. a blocked network or ad blocker — the boot screen shows a bilingual explanation and a Retry button instead of hanging silently.
+- `favicon.svg` + `manifest.json` make the app installable/bookmarkable with a proper icon (Add to Home Screen on mobile).
+- `404.html` gives GitHub Pages a branded not-found page.
+- Open Graph / Twitter meta tags are included so shared links show a title and description.
 
 ## Important Statistical Limitation / ข้อจำกัดสำคัญ
 
