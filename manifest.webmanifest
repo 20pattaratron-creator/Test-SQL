@@ -1,0 +1,11 @@
+{
+  "name": "Data Insight SQL Dashboard Pro Mobile",
+  "short_name": "Data Insight",
+  "description": "Mobile-friendly blue theme dashboard for SQL, Business Analytics, Tableau, Power BI and SPSS learning.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#eef6ff",
+  "theme_color": "#2563eb",
+  "lang": "th-TH",
+  "orientation": "portrait-primary"
+}

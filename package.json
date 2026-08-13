@@ -1,0 +1,11 @@
+{
+  "name": "data-insight-sql-dashboard-github-pages-free",
+  "version": "3.2.0",
+  "type": "module",
+  "scripts": {
+    "check": "node --check app.js",
+    "serve": "python3 -m http.server 8080"
+  },
+  "description": "GitHub Pages-only free static data analytics web app with SQLite in browser, Excel/CSV smart import, SQL learning, dashboard, data quality, Tableau/Power BI/SPSS helpers and mobile-friendly UI",
+  "license": "MIT"
+}

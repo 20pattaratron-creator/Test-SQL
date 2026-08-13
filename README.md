@@ -1,131 +1,109 @@
-# Data Analytics Studio — Blue Theme + SPSS-style Verified Statistics
+# Data Insight SQL Dashboard — GitHub Pages Free Edition
 
-เว็บแอปสำหรับ **SQLite + Data Analytics + SPSS-style Statistics + Charts + Dashboard** ทำงานใน Browser พร้อม Light/Dark Mode และคำอธิบายสองภาษา (ไทย/English)
+เว็บวิเคราะห์ข้อมูลแบบ Static Web App สำหรับเผยแพร่ฟรีบน GitHub Pages ให้ผู้ใช้ทั่วไปทดลองวิเคราะห์ Excel/CSV, ดู Dashboard, ตรวจคุณภาพข้อมูล, แก้ไขข้อมูล, เรียน SQL และนำไปต่อยอดได้ โดยไม่ต้องมี Server
 
-Browser-based **SQLite + Data Analytics + SPSS-style Statistics + Charts + Dashboard** workspace with Light/Dark Mode and bilingual Thai/English explanations.
+## เหมาะกับใคร
 
-## Highlights / จุดเด่น
+- ผู้ใช้มือใหม่ที่มีไฟล์ Excel/CSV แต่อยากดู Dashboard ทันที
+- ผู้ที่ไม่รู้ SQL แต่อยากเริ่มเรียนจากข้อมูลจริง
+- ครู/อาจารย์/ทีมงานที่อยากเปิดเว็บให้คนใช้ฟรี
+- นักพัฒนาที่อยาก Fork ไปต่อยอดเป็นระบบวิเคราะห์ข้อมูลของตนเอง
 
-- Blue UI theme with Light / Dark Mode
-- SQLite Manager and SQL Editor
-- Import CSV / Excel / SQLite and experimental SPSS `.sav`
-- Data View preview 500 rows for UI performance
-- **Statistical analyses use the complete current table** (not a silent 5,000-row sample)
-- Variable View and Data Profile
-- SPSS-style statistical output with bilingual explanations
-- Formula/source links inside the UI
-- Chart Builder and Dashboard
-- Guide / คู่มือ explaining each statistical method and each Business Analyst tool
+## หลักการของเวอร์ชันนี้
 
-## Statistical Methods / วิธีวิเคราะห์สถิติ
+เวอร์ชันนี้ออกแบบให้ใช้กับ GitHub Pages เท่านั้น จึงเป็น Static Web App 100%:
 
-1. Descriptive Statistics / สถิติเชิงพรรณนา
-2. Frequencies / ตารางแจกแจงความถี่
-3. Crosstabs / ตารางไขว้
-4. Pearson Correlation / สหสัมพันธ์เพียร์สัน
-5. Simple Linear Regression / การถดถอยเชิงเส้นอย่างง่าย
-6. Independent-Samples t Test / t-test สองกลุ่มอิสระ
-7. Paired-Samples t Test / t-test แบบจับคู่
-8. Chi-Square Test of Independence / ไคสแควร์ทดสอบความเป็นอิสระ
-9. One-Way ANOVA / ANOVA ทางเดียว
+- ไม่มี Backend Node.js
+- ไม่มี Vercel Functions
+- ไม่มี MySQL Password หรือ Secret ใน Frontend
+- วิเคราะห์ข้อมูลด้วย SQLite ใน Browser ผ่าน sql.js
+- อ่าน Excel/CSV ใน Browser ผ่าน SheetJS
+- สร้างกราฟใน Browser ผ่าน Plotly
+- ข้อมูลที่ผู้ใช้อัปโหลดอยู่ใน Browser ของผู้ใช้เป็นหลัก ไม่ถูกส่งเข้า Server ของโปรเจกต์นี้
 
-Core formulas are implemented in `statistics.js` and documented in [`FORMULA_REFERENCES.md`](FORMULA_REFERENCES.md). Primary formula references use the NIST/SEMATECH statistical handbook / NIST Dataplot documentation, with official IBM SPSS documentation used for SPSS workflow context.
+## ฟีเจอร์หลัก
 
-## Accuracy Improvements / การปรับปรุงความถูกต้อง
+- Excel/CSV Smart Import Wizard
+- รองรับ Excel หลาย Sheet และเลือก Sheet ได้
+- Mapping หัวตารางหลายภาษาเบื้องต้น
+- Date Parser รองรับ ค.ศ./พ.ศ./ปี 2 หลัก
+- แยกวันที่เป็น วัน เดือน ปี ไตรมาส ปี-เดือน และวันในสัปดาห์
+- Data Quality Center ตรวจค่าว่าง วันที่ผิด ยอดขายผิด จำนวนติดลบ ฯลฯ
+- แก้ไขข้อมูลรายแถว และเลือกไม่นำแถวผิดไปคำนวณได้
+- Dashboard และ Business Analytics
+- โหมดถามข้อมูลง่าย ๆ สำหรับผู้ไม่รู้ SQL
+- โหมดเรียน SQL พร้อม Query Builder, Explain SQL และ Friendly Error Helper
+- Table Browser, SQL Editor, MySQL Template Helper, Tableau Helper, Power BI Helper, SPSS Helper
+- Mobile Friendly พร้อม Bottom Navigation
+- Light/Dark Mode ธีมน้ำเงิน
 
-- Sample variance and sample standard deviation use denominator `n − 1`.
-- Adjusted Fisher–Pearson skewness is used.
-- Statistical procedures use explicit missing-value handling.
-- Correlation/regression/t-test pairwise procedures use complete numeric pairs only.
-- Pearson correlation includes two-sided significance testing.
-- Regression reports OLS model summary, ANOVA, coefficient SE, t, p, and 95% CI.
-- Independent t test reports both Welch and pooled equal-variance versions.
-- Paired t test analyzes within-pair differences.
-- Chi-square computes expected counts from marginal totals and flags sparse expected counts.
-- One-way ANOVA reports between/within sums of squares, mean squares, F, p and supplementary effect sizes.
-- Frequencies are sorted naturally so cumulative percent follows the displayed value order.
-- Crosstab totals are based on the same complete-pair cases as table cells.
-
-## Business Analyst Guide / คู่มือ Business Analyst
-
-The built-in Guide explains the purpose of:
-
-- Excel
-- SQL / SQLite
-- R / RStudio
-- SPSS-style Statistics
-- Power Query
-- Power BI
-- Tableau
-- Business Problem Solving
-
-Each item includes Thai and English descriptions plus official reference links where applicable.
-
-## Run / วิธีเปิด
-
-Because the app loads WebAssembly and ES modules, run it through a local web server rather than double-clicking `index.html`.
+## วิธีเปิดบนเครื่องตัวเอง
 
 ```bash
-cd data-analytics-studio
-python -m http.server 8080
+cd data-insight-sql-dashboard-github-pages-free
+python3 -m http.server 8080
 ```
 
-Open:
+เปิดเว็บ:
 
 ```text
 http://localhost:8080
 ```
 
-## Formula Validation Test / ชุดทดสอบสูตร
+หรือเปิด `index.html` โดยตรงก็ได้ แต่แนะนำผ่าน local server เพื่อให้ไฟล์และ CDN ทำงานใกล้เคียง GitHub Pages มากกว่า
 
-If Node.js is installed:
+## วิธีอัปโหลดขึ้น GitHub Pages
 
-```bash
-node statistics.test.mjs
-```
+1. สร้าง GitHub Repository ใหม่ เช่น `data-insight-sql-dashboard`
+2. อัปโหลดไฟล์ทั้งหมดในโฟลเดอร์นี้ขึ้น repository
+3. เข้า `Settings` → `Pages`
+4. เลือก `Deploy from a branch`
+5. เลือก Branch: `main`
+6. เลือก Folder: `/root`
+7. กด Save
+8. รอ GitHub สร้างเว็บ แล้วเปิด URL รูปแบบ `https://ชื่อผู้ใช้.github.io/ชื่อ-repository/`
 
-Expected:
+ดูรายละเอียดเพิ่มเติมใน `docs/GITHUB_PAGES_DEPLOY_TH.md`
+
+## โครงสร้างสำคัญ
 
 ```text
-All statistical core tests passed.
+index.html
+styles.css
+app.js
+sample_sales.csv
+manifest.webmanifest
+.nojekyll
+LICENSE
+NOTICE.md
+CONTRIBUTING.md
+docs/
 ```
 
-## Files / โครงสร้างไฟล์
+## ข้อจำกัดของ GitHub Pages
 
-```text
-data-analytics-studio/
-├── index.html
-├── 404.html
-├── manifest.json
-├── favicon.svg
-├── styles.css
-├── app.js
-├── statistics.js
-├── statistics_test.mjs
-├── FORMULA_REFERENCES.md
-├── README.md
-└── THIRD_PARTY_NOTICES.md
-```
+GitHub Pages เหมาะกับ HTML/CSS/JavaScript แบบ Static เท่านั้น จึงไม่เหมาะกับงานที่ต้องใช้ Server-side code โดยตรง เช่น Node.js API, Python backend, PHP backend หรือการต่อ MySQL แบบปลอดภัยจากหน้าเว็บโดยตรง
 
-## New in this update / อัปเดตล่าสุด
+ถ้าในอนาคตต้องใช้ฐานข้อมูลจริง ให้แยกเป็นอีกเวอร์ชันหนึ่ง เช่น Frontend บน GitHub Pages และ Backend/API บนบริการอื่น แต่เวอร์ชันนี้ตั้งใจทำให้ใช้ฟรีและต่อยอดง่ายที่สุด
 
-- **Auto-save (IndexedDB)**: the working SQLite database and dashboard charts are saved to the browser's IndexedDB automatically after every change, and restored the next time you open the app — refreshing the page or closing the tab no longer loses your work.
-- **Confirm before destructive actions**: "New Database" and "Reset Dashboard" now ask for confirmation before clearing data.
-- **Levene's Test** (Brown–Forsythe, median-based) is now reported alongside the Independent-Samples t Test and the One-Way ANOVA to check the equal-variance assumption.
-- **Post-hoc pairwise comparisons** are now reported automatically after a significant One-Way ANOVA (pairwise Welch t-tests with Bonferroni correction — chosen over Tukey HSD because it does not require assuming equal variances and needs no studentized-range approximation).
+## เครดิตต้นฉบับ
 
-## Production Readiness Notes / บันทึกความพร้อมใช้งาน
+โปรเจกต์นี้ได้รับแรงบันดาลใจและต่อยอดแนวคิดจาก:
 
-- A full-screen boot loader shows load progress and automatically hides once the SQLite engine and sample data are ready.
-- If the CDN libraries (sql.js, SheetJS, Chart.js) fail to load — e.g. a blocked network or ad blocker — the boot screen shows a bilingual explanation and a Retry button instead of hanging silently.
-- `favicon.svg` + `manifest.json` make the app installable/bookmarkable with a proper icon (Add to Home Screen on mobile).
-- `404.html` gives GitHub Pages a branded not-found page.
-- Open Graph / Twitter meta tags are included so shared links show a title and description.
+- SQLite Manager by Goragod Wiriya
+- Demo: https://goragodwiriya.github.io/SQLLite/
+- Code: https://github.com/goragodwiriya/SQLLite
+- License: MIT License
 
-## Important Statistical Limitation / ข้อจำกัดสำคัญ
+โปรดเก็บไฟล์ `NOTICE.md` และ `LICENSE` ไว้เสมอเมื่อเผยแพร่หรือแก้ไขต่อ
 
-This project is a custom browser analytics application with an SPSS-style workflow; **it is not IBM SPSS Statistics**. Statistical correctness is not only a matter of formulas. Method selection depends on study design, measurement level, independence, distributional/model assumptions, missing-data mechanism, and data quality.
+## เอกสารแนะนำ
 
-โปรแกรมนี้เป็นเว็บแอปที่พัฒนาขึ้นเองและใช้ workflow แบบ SPSS แต่ **ไม่ใช่ IBM SPSS Statistics** ความถูกต้องไม่ได้ขึ้นกับสูตรเพียงอย่างเดียว แต่ยังขึ้นกับการออกแบบการศึกษา ระดับการวัด ความเป็นอิสระ สมมติฐานของโมเดล ลักษณะข้อมูลสูญหาย และคุณภาพข้อมูล
-
-For high-stakes decisions, regulated work, or publication, independently validate results in a recognized statistical package and have the analysis reviewed by an appropriate domain/statistics expert.
+- `docs/GITHUB_PAGES_DEPLOY_TH.md`
+- `docs/OPEN_SOURCE_FREE_USE_TH.md`
+- `docs/GITHUB_PAGES_LIMITATIONS_TH.md`
+- `docs/SMART_IMPORT_WIZARD_TH.md`
+- `docs/SQL_LEARNING_MODE_TH.md`
+- `docs/DATA_QUALITY_RULES_TH.md`
+- `docs/MOBILE_GUIDE_TH.md`
+- `docs/SPSS_GUIDE_TH.md`
