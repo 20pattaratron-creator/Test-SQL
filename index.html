@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Data Analytics Studio: SQLite Manager, SPSS-style Statistics and Dashboard Builder in the browser / เครื่องมือจัดการ SQLite วิเคราะห์สถิติแบบ SPSS และสร้าง Dashboard ทำงานในเบราว์เซอร์ ไม่ต้องติดตั้ง" />
+  <meta name="keywords" content="SQLite, SPSS, statistics, dashboard, data analytics, สถิติ, วิเคราะห์ข้อมูล" />
+  <title>Data Analytics Studio</title>
+  <meta name="theme-color" content="#0b3b8f" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="favicon.svg" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="DA Studio" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Data Analytics Studio" />
+  <meta property="og:description" content="SQLite Manager, SPSS-style Statistics and Dashboard Builder — ทำงานในเบราว์เซอร์ทั้งหมด ไม่ต้องติดตั้งหรือส่งข้อมูลขึ้นเซิร์ฟเวอร์" />
+  <meta property="og:image" content="favicon.svg" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Data Analytics Studio" />
+  <meta name="twitter:description" content="SQLite Manager, SPSS-style Statistics and Dashboard Builder in the browser" />
+  <script>
+    (() => {
+      const saved = localStorage.getItem('das-theme');
+      const preferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = saved || preferred;
+    })();
+  </script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <noscript>
+    <div style="padding:40px;font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;text-align:center">
+      <h1>Data Analytics Studio</h1>
+      <p>แอปนี้ต้องเปิดใช้งาน JavaScript เพื่อทำงาน กรุณาเปิด JavaScript ในเบราว์เซอร์แล้วโหลดหน้านี้ใหม่<br>This app requires JavaScript. Please enable JavaScript and reload the page.</p>
+    </div>
+  </noscript>
+
+  <div id="bootLoader" class="boot-loader" role="status" aria-live="polite">
+    <div class="boot-card">
+      <div class="boot-mark">DA</div>
+      <div class="boot-title">Data Analytics Studio</div>
+      <div class="boot-spinner" aria-hidden="true"></div>
+      <div id="bootMessage" class="boot-message">กำลังโหลดเครื่องมือวิเคราะห์ข้อมูล... / Loading analytics engine...</div>
+      <div id="bootActions" class="boot-actions" hidden>
+        <p class="boot-hint">โหลดช้ากว่าปกติ อาจเกิดจากอินเทอร์เน็ตหรือตัวบล็อกโฆษณาที่บล็อก CDN<br>Taking longer than expected — this can happen if a network filter or ad blocker is blocking the CDN scripts.</p>
+        <button id="bootRetryBtn" class="btn primary" type="button">ลองใหม่ / Retry</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <button id="sidebarToggle" class="icon-btn" title="Toggle sidebar">☰</button>
+        <div class="brand-mark">DA</div>
+        <div>
+          <div class="brand-title">Data Analytics Studio</div>
+          <div id="fileNameLabel" class="brand-subtitle">Browser Data Workbench</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <label class="btn secondary file-btn">
+          <input id="fileInput" type="file" accept=".db,.sqlite,.sqlite3,.csv,.xlsx,.xls,.sav" hidden />
+          เปิดไฟล์
+        </label>
+        <button id="newDbBtn" class="btn secondary">ฐานข้อมูลใหม่</button>
+        <button id="sampleBtn" class="btn secondary">ข้อมูลตัวอย่าง</button>
+        <button id="saveDbBtn" class="btn primary">บันทึก SQLite</button>
+        <button id="themeBtn" class="theme-toggle" type="button" title="สลับโหมดสว่าง/มืด" aria-label="สลับโหมดสว่างและมืด">
+          <span class="theme-icon sun" aria-hidden="true">☀</span>
+          <span class="theme-icon moon" aria-hidden="true">☾</span>
+          <span id="themeLabel">Light</span>
+        </button>
+      </div>
+    </header>
+
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-section">
+        <div class="section-title">WORKSPACE</div>
+        <button class="nav-item active" data-view="overview"><span>◫</span> Overview</button>
+        <button class="nav-item" data-view="data"><span>▦</span> Data View</button>
+        <button class="nav-item" data-view="variables"><span>≡</span> Variable View</button>
+        <button class="nav-item" data-view="sql"><span>⌘</span> SQL Editor</button>
+        <button class="nav-item" data-view="spss"><span>Σ</span> SPSS Mode</button>
+        <button class="nav-item" data-view="charts"><span>▥</span> Charts</button>
+        <button class="nav-item" data-view="dashboard"><span>▤</span> Dashboard</button>
+        <button class="nav-item" data-view="guide"><span>?</span> Guide / คู่มือ</button>
+      </div>
+
+      <div class="sidebar-section grow">
+        <div class="section-title row-between">
+          <span>TABLES</span><span id="tableCountBadge" class="badge">0</span>
+        </div>
+        <input id="tableSearch" class="search-input" placeholder="ค้นหาตาราง..." />
+        <div id="tableList" class="table-list empty-state">ยังไม่มีตาราง</div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div><span class="status-dot"></span> <span id="engineStatus">กำลังโหลด SQLite...</span></div>
+        <small id="autosaveStatus">ประมวลผลใน Browser</small>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <section id="view-overview" class="view active">
+        <div class="page-header">
+          <div>
+            <h1>Overview</h1>
+            <p>จัดการ SQLite วิเคราะห์ข้อมูลแบบ SPSS และสร้าง Dashboard ในหน้าเดียว</p>
+          </div>
+          <button id="importShortcut" class="btn primary">Import Data</button>
+        </div>
+
+        <div class="metrics-grid">
+          <article class="metric-card"><span>Tables</span><strong id="metricTables">0</strong><small>จำนวนตาราง</small></article>
+          <article class="metric-card"><span>Rows</span><strong id="metricRows">0</strong><small>แถวในตารางที่เลือก</small></article>
+          <article class="metric-card"><span>Variables</span><strong id="metricColumns">0</strong><small>คอลัมน์ในตารางที่เลือก</small></article>
+          <article class="metric-card"><span>Missing</span><strong id="metricMissing">0%</strong><small>สัดส่วนข้อมูลว่าง</small></article>
+        </div>
+
+        <div class="grid-2">
+          <article class="panel">
+            <div class="panel-head"><h2>Start / เริ่มต้นใช้งาน</h2></div>
+            <div class="quick-actions">
+              <button class="quick-card" data-action="open-file"><b>01</b><span><strong>เปิดข้อมูล</strong><small>SQLite / CSV / Excel / SPSS .sav*</small></span></button>
+              <button class="quick-card" data-action="go-sql"><b>02</b><span><strong>เขียน SQL</strong><small>SELECT / JOIN / GROUP BY / CTE</small></span></button>
+              <button class="quick-card" data-action="go-spss"><b>03</b><span><strong>SPSS-style Statistics / วิเคราะห์สถิติ</strong><small>Descriptives / t-tests / Chi-Square / ANOVA / Correlation / Regression</small></span></button>
+              <button class="quick-card" data-action="go-chart"><b>04</b><span><strong>สร้างกราฟ</strong><small>Bar / Line / Pie / Scatter</small></span></button>
+            </div>
+            <p class="note">* การอ่านไฟล์ .sav เป็นโหมด Experimental และขึ้นกับรูปแบบไฟล์</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head"><h2>Dataset Profile</h2><span id="profileTableName" class="pill">No table</span></div>
+            <div id="profileContent" class="profile-list empty-state">เลือกหรือนำเข้าตารางเพื่อดู Profile</div>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-data" class="view">
+        <div class="page-header compact">
+          <div><h1>Data View</h1><p id="dataSubtitle">แสดงข้อมูลแบบตาราง</p></div>
+          <div class="page-actions">
+            <button id="exportCsvBtn" class="btn secondary">Export CSV</button>
+          </div>
+        </div>
+        <div class="panel table-panel">
+          <div id="dataTableWrap" class="data-table-wrap empty-state">ยังไม่มีข้อมูล</div>
+        </div>
+      </section>
+
+      <section id="view-variables" class="view">
+        <div class="page-header compact"><div><h1>Variable View</h1><p>มุมมองคล้าย SPSS Variable View พร้อมชนิดและระดับการวัด</p></div></div>
+        <div class="panel table-panel"><div id="variableTableWrap" class="data-table-wrap empty-state">ยังไม่มีตัวแปร</div></div>
+      </section>
+
+      <section id="view-sql" class="view">
+        <div class="page-header compact">
+          <div><h1>SQL Editor</h1><p>กด Ctrl/Cmd + Enter เพื่อรัน SQL</p></div>
+          <button id="runSqlBtn" class="btn primary">▶ Run Query</button>
+        </div>
+        <div class="sql-layout">
+          <article class="panel editor-panel">
+            <div class="panel-head"><h2>Query</h2><div style="display:flex;gap:6px;align-items:center"><button id="historyBtn" class="text-btn">ประวัติ / History (<span id="historyCount">0</span>)</button><button id="formatSqlBtn" class="text-btn">ตัวอย่าง Query</button></div></div>
+            <textarea id="sqlEditor" spellcheck="false">SELECT * FROM sales LIMIT 100;</textarea>
+            <div id="historyPanel" class="history-panel" hidden></div>
+          </article>
+          <article class="panel result-panel">
+            <div class="panel-head"><h2>Result</h2><span id="queryMeta" class="pill">Ready</span></div>
+            <div id="queryResult" class="data-table-wrap empty-state">ผลลัพธ์จะแสดงที่นี่</div>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-spss" class="view">
+        <div class="page-header compact"><div><h1>SPSS Mode</h1><p>Statistical Analysis / การวิเคราะห์สถิติ — สูตรอ้างอิง NIST และแนวทาง IBM SPSS</p></div><span class="pill accuracy-pill">Verified Methods / สูตรตรวจสอบแล้ว</span></div>
+        <div class="spss-shell">
+          <aside class="analysis-menu panel">
+            <button class="analysis-item active" data-analysis="descriptives">Descriptives / สถิติเชิงพรรณนา</button>
+            <button class="analysis-item" data-analysis="frequencies">Frequencies / ความถี่</button>
+            <button class="analysis-item" data-analysis="crosstabs">Crosstabs / ตารางไขว้</button>
+            <button class="analysis-item" data-analysis="correlation">Pearson Correlation / สหสัมพันธ์</button>
+            <button class="analysis-item" data-analysis="regression">Linear Regression / การถดถอย</button>
+            <button class="analysis-item" data-analysis="independentT">Independent t Test / t-test อิสระ</button>
+            <button class="analysis-item" data-analysis="pairedT">Paired t Test / t-test จับคู่</button>
+            <button class="analysis-item" data-analysis="chiSquare">Chi-Square / ไคสแควร์</button>
+            <button class="analysis-item" data-analysis="anova">One-Way ANOVA / ANOVA ทางเดียว</button>
+            <div class="analysis-divider">Nonparametric / ไม่อิงพารามิเตอร์</div>
+            <button class="analysis-item" data-analysis="mannWhitney">Mann-Whitney U / แมนน์-วิตนีย์ยู</button>
+            <button class="analysis-item" data-analysis="wilcoxon">Wilcoxon Signed-Rank / วิลคอกซัน</button>
+            <button class="analysis-item" data-analysis="kruskalWallis">Kruskal-Wallis H / ครัสคัล-วอลลิส</button>
+          </aside>
+          <div class="analysis-main">
+            <article class="panel analysis-config">
+              <div class="panel-head"><h2 id="analysisTitle">Descriptive Statistics</h2></div>
+              <div id="analysisControls" class="analysis-controls"></div>
+              <button id="runAnalysisBtn" class="btn primary">Run Analysis</button>
+            </article>
+            <article class="panel output-panel">
+              <div class="panel-head"><h2>Output</h2><button id="clearOutputBtn" class="text-btn">Clear</button></div>
+              <div id="analysisOutput" class="analysis-output empty-state">ผลวิเคราะห์จะแสดงในรูปแบบ Output Viewer</div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-charts" class="view">
+        <div class="page-header compact"><div><h1>Chart Builder</h1><p>เลือกตัวแปรแล้วสร้างกราฟจากข้อมูลในตารางปัจจุบัน</p></div></div>
+        <div class="grid-chart">
+          <article class="panel">
+            <div class="panel-head"><h2>Chart Settings</h2></div>
+            <div class="form-grid">
+              <label>Chart Type<select id="chartType"><option value="bar">Bar</option><option value="line">Line</option><option value="pie">Pie</option><option value="scatter">Scatter</option></select></label>
+              <label>X / Category<select id="chartX"></select></label>
+              <label>Y / Value<select id="chartY"></select></label>
+              <label>Aggregation<select id="chartAgg"><option value="sum">Sum</option><option value="avg">Average</option><option value="count">Count</option></select></label>
+            </div>
+            <button id="buildChartBtn" class="btn primary">Build Chart</button>
+            <button id="addDashboardBtn" class="btn secondary">Add to Dashboard</button>
+          </article>
+          <article class="panel chart-panel"><canvas id="chartCanvas"></canvas><div id="chartPlaceholder" class="empty-state">ตั้งค่ากราฟแล้วกด Build Chart</div></article>
+        </div>
+      </section>
+
+      <section id="view-dashboard" class="view">
+        <div class="page-header compact"><div><h1>Dashboard</h1><p>สรุปภาพรวมและกราฟที่บันทึกไว้</p></div><button id="resetDashboardBtn" class="btn secondary">Reset</button></div>
+        <div class="metrics-grid dashboard-kpis">
+          <article class="metric-card"><span>Rows</span><strong id="dashRows">0</strong><small>Current table</small></article>
+          <article class="metric-card"><span>Columns</span><strong id="dashCols">0</strong><small>Current table</small></article>
+          <article class="metric-card"><span>Numeric</span><strong id="dashNumeric">0</strong><small>Numeric variables</small></article>
+          <article class="metric-card"><span>Missing</span><strong id="dashMissing">0%</strong><small>Missing cells</small></article>
+        </div>
+        <div id="dashboardCharts" class="dashboard-grid"><div class="panel empty-state">ยังไม่มีกราฟใน Dashboard — สร้างจาก Chart Builder แล้วกด Add to Dashboard</div></div>
+      </section>
+
+
+      <section id="view-guide" class="view">
+        <div class="page-header compact">
+          <div>
+            <h1>Guide & Formula Reference / คู่มือและแหล่งอ้างอิงสูตร</h1>
+            <p>คำอธิบายภาษาไทย + English, สูตรที่ใช้จริงในโปรแกรม, สมมติฐาน และแหล่งอ้างอิงทางการ</p>
+          </div>
+        </div>
+        <div id="guideContent" class="guide-content"></div>
+      </section>
+    </main>
+
+    <footer class="statusbar">
+      <span id="statusText">Ready</span>
+      <span id="statusStats">0 rows · 0 columns</span>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/sql-wasm.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

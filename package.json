@@ -1,0 +1,12 @@
+{
+  "name": "data-insight-analytics-studio-github-pages",
+  "version": "4.0.0",
+  "type": "module",
+  "description": "GitHub Pages static data analytics studio using browser SQLite, Excel/CSV import, SPSS-style statistics, SQL editor, charts and dashboard.",
+  "license": "MIT",
+  "scripts": {
+    "check": "node --check app.js && node --check statistics.js",
+    "test": "node statistics_test.mjs",
+    "serve": "python3 -m http.server 8080"
+  }
+}
