@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Data Analytics Studio: SQLite Manager, SPSS-style Statistics and Dashboard Builder in the browser / เครื่องมือจัดการ SQLite วิเคราะห์สถิติแบบ SPSS และสร้าง Dashboard ทำงานในเบราว์เซอร์ ไม่ต้องติดตั้ง" />
+  <meta name="description" content="Data Insight Analytics Studio: GitHub Pages free data analytics app with SQLite, Excel/CSV Smart Import, SQL Learning, SPSS-style Statistics, Data Quality, Privacy Masking and Dashboard Builder in the browser" />
   <meta name="keywords" content="SQLite, SPSS, statistics, dashboard, data analytics, สถิติ, วิเคราะห์ข้อมูล" />
-  <title>Data Analytics Studio</title>
+  <title>Data Insight Analytics Studio — GitHub Pages Free Edition</title>
   <meta name="theme-color" content="#0b3b8f" />
   <meta name="color-scheme" content="light dark" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
@@ -56,7 +56,7 @@
         <button id="sidebarToggle" class="icon-btn" title="Toggle sidebar">☰</button>
         <div class="brand-mark">DA</div>
         <div>
-          <div class="brand-title">Data Analytics Studio</div>
+          <div class="brand-title">Data Insight Analytics Studio</div>
           <div id="fileNameLabel" class="brand-subtitle">Browser Data Workbench</div>
         </div>
       </div>
@@ -83,6 +83,10 @@
         <button class="nav-item" data-view="data"><span>▦</span> Data View</button>
         <button class="nav-item" data-view="variables"><span>≡</span> Variable View</button>
         <button class="nav-item" data-view="sql"><span>⌘</span> SQL Editor</button>
+        <button class="nav-item" data-view="smart-import"><span>⇪</span> Smart Import</button>
+        <button class="nav-item" data-view="sql-learning"><span>⌁</span> SQL Learning</button>
+        <button class="nav-item" data-view="data-quality"><span>✓</span> Data Quality</button>
+        <button class="nav-item" data-view="privacy"><span>◎</span> Privacy</button>
         <button class="nav-item" data-view="spss"><span>Σ</span> SPSS Mode</button>
         <button class="nav-item" data-view="charts"><span>▥</span> Charts</button>
         <button class="nav-item" data-view="dashboard"><span>▤</span> Dashboard</button>
@@ -125,9 +129,12 @@
             <div class="panel-head"><h2>Start / เริ่มต้นใช้งาน</h2></div>
             <div class="quick-actions">
               <button class="quick-card" data-action="open-file"><b>01</b><span><strong>เปิดข้อมูล</strong><small>SQLite / CSV / Excel / SPSS .sav*</small></span></button>
-              <button class="quick-card" data-action="go-sql"><b>02</b><span><strong>เขียน SQL</strong><small>SELECT / JOIN / GROUP BY / CTE</small></span></button>
-              <button class="quick-card" data-action="go-spss"><b>03</b><span><strong>SPSS-style Statistics / วิเคราะห์สถิติ</strong><small>Descriptives / t-tests / Chi-Square / ANOVA / Correlation / Regression</small></span></button>
-              <button class="quick-card" data-action="go-chart"><b>04</b><span><strong>สร้างกราฟ</strong><small>Bar / Line / Pie / Scatter</small></span></button>
+              <button class="quick-card" data-action="go-smart-import"><b>02</b><span><strong>Smart Import</strong><small>Excel หลาย Sheet / Mapping / Date Parser</small></span></button>
+              <button class="quick-card" data-action="go-sql-learning"><b>03</b><span><strong>ลองเรียน SQL</strong><small>เลือกคำถาม → ระบบสร้าง SQL และอธิบาย</small></span></button>
+              <button class="quick-card" data-action="go-sql"><b>04</b><span><strong>เขียน SQL</strong><small>SELECT / JOIN / GROUP BY / CTE</small></span></button>
+              <button class="quick-card" data-action="go-data-quality"><b>05</b><span><strong>ตรวจคุณภาพข้อมูล</strong><small>ค่าว่าง / วันที่ผิด / ข้อมูลผิดปกติ</small></span></button>
+              <button class="quick-card" data-action="go-spss"><b>06</b><span><strong>SPSS-style Statistics</strong><small>Descriptives / t-tests / Chi-Square / ANOVA</small></span></button>
+              <button class="quick-card" data-action="go-chart"><b>07</b><span><strong>สร้างกราฟ</strong><small>Bar / Line / Pie / Scatter</small></span></button>
             </div>
             <p class="note">* การอ่านไฟล์ .sav เป็นโหมด Experimental และขึ้นกับรูปแบบไฟล์</p>
           </article>
@@ -233,6 +240,172 @@
           <article class="metric-card"><span>Missing</span><strong id="dashMissing">0%</strong><small>Missing cells</small></article>
         </div>
         <div id="dashboardCharts" class="dashboard-grid"><div class="panel empty-state">ยังไม่มีกราฟใน Dashboard — สร้างจาก Chart Builder แล้วกด Add to Dashboard</div></div>
+      </section>
+
+
+      <section id="view-smart-import" class="view">
+        <div class="page-header compact">
+          <div>
+            <h1>Smart Import Wizard</h1>
+            <p>นำเข้า Excel/CSV สำหรับมือใหม่: เลือก Sheet, ตรวจหัวตาราง, Mapping หลายภาษา, แปลงวันที่ และเตรียมข้อมูลก่อน Dashboard</p>
+          </div>
+          <label class="btn primary file-btn"><input id="smartFileInput" type="file" accept=".csv,.xlsx,.xls" hidden />อัปโหลด Excel/CSV</label>
+        </div>
+        <div class="studio-hero panel">
+          <div>
+            <span class="eyebrow">BEGINNER SAFE IMPORT</span>
+            <h2>เริ่มจากไฟล์ Excel จริง โดยไม่ต้องรู้ SQL</h2>
+            <p>ระบบนี้ทำงานบน Browser ทั้งหมด เหมาะกับ GitHub Pages และช่วยลดความผิดพลาดก่อนนำข้อมูลไปคำนวณ เช่น วันที่กำกวม, หัวตารางหลายภาษา, รหัสลูกค้า/สินค้า, ค่าว่าง และข้อมูลส่วนบุคคล</p>
+          </div>
+          <div class="hero-actions">
+            <button id="smartUseCurrentBtn" class="btn secondary" type="button">ตรวจตารางปัจจุบัน</button>
+            <button id="smartGoQualityBtn" class="btn secondary" type="button">ไป Data Quality</button>
+          </div>
+        </div>
+        <div class="workflow-steps">
+          <article class="step-card"><b>1</b><h3>เลือกไฟล์</h3><p>รองรับ CSV, XLSX, XLS และอ่านข้อมูลใน Browser ไม่ส่งไฟล์ขึ้น Server</p></article>
+          <article class="step-card"><b>2</b><h3>เลือก Sheet</h3><p>ถ้ามีหลาย Sheet ให้แยกเป็นตาราง หรือรวม Sheet ที่หัวตารางเหมือนกัน</p></article>
+          <article class="step-card"><b>3</b><h3>Mapping</h3><p>จับคู่หัวตารางไทย/อังกฤษ/จีน/ญี่ปุ่น/คำย่อ เช่น วันที่ขาย → order_date</p></article>
+          <article class="step-card"><b>4</b><h3>ตรวจวันที่</h3><p>รองรับ ค.ศ./พ.ศ./ปี 2 หลัก และแยกวัน เดือน ปี ไตรมาส</p></article>
+          <article class="step-card"><b>5</b><h3>ตรวจคุณภาพ</h3><p>หาค่าว่าง ข้อมูลซ้ำ ตัวเลขผิดปกติ และเลือก exclude จากการคำนวณ</p></article>
+          <article class="step-card"><b>6</b><h3>วิเคราะห์</h3><p>ส่งต่อไป Dashboard, SQL Learning, SPSS Mode, Chart Builder และ Export CSV</p></article>
+        </div>
+        <div class="grid-2">
+          <article class="panel">
+            <div class="panel-head"><h2>Column Mapping Preview</h2><span id="smartMappingBadge" class="pill">No table</span></div>
+            <div id="smartMappingResult" class="data-table-wrap empty-state">เลือกตารางหรือนำเข้าไฟล์เพื่อดูคำแนะนำการจับคู่คอลัมน์</div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><h2>Date Parser Examples</h2><span class="pill">พ.ศ./ค.ศ.</span></div>
+            <div id="smartDateExamples" class="date-example-grid"></div>
+          </article>
+        </div>
+        <article class="panel checklist-panel">
+          <div class="panel-head"><h2>Checklist ก่อน Import</h2></div>
+          <ul class="check-list">
+            <li>รหัสลูกค้า, รหัสสินค้า, เลขบัตร, เบอร์โทร ควรเป็น Text ไม่ใช่ตัวเลข</li>
+            <li>วันที่แบบ 06/11/2026 ต้องเลือกก่อนว่าเป็น วัน/เดือน/ปี หรือ เดือน/วัน/ปี</li>
+            <li>ถ้ามีหลาย Sheet เป็นรายเดือนและหัวตารางเหมือนกัน ควรรวมเป็นตารางเดียวแล้วเพิ่ม _source_sheet</li>
+            <li>ถ้าเป็น Sheet คนละเรื่อง เช่น ลูกค้า/สินค้า/ยอดขาย ควรแยกเป็นคนละตาราง</li>
+            <li>แถวที่ผิดควรแก้ไข หรือ mark ว่า _exclude_from_analysis = 1 ก่อนคำนวณ Dashboard</li>
+          </ul>
+        </article>
+      </section>
+
+      <section id="view-sql-learning" class="view">
+        <div class="page-header compact">
+          <div>
+            <h1>SQL Learning Mode</h1>
+            <p>สำหรับผู้ใช้มือใหม่: เลือกคำถาม → ระบบสร้าง SQL → อธิบายทีละส่วน → รันจริงกับข้อมูลของคุณ</p>
+          </div>
+          <button id="learningSendToSqlBtn" class="btn primary" type="button">ส่งไป SQL Editor</button>
+        </div>
+        <div class="grid-2">
+          <article class="panel">
+            <div class="panel-head"><h2>สร้าง SQL จากตัวเลือก</h2><span id="learningTableBadge" class="pill">sales_data</span></div>
+            <div class="form-grid">
+              <label>คำถามที่อยากรู้<select id="learningLesson">
+                <option value="preview">ดูข้อมูล 20 แถวแรก</option>
+                <option value="groupSum">รวมยอดตามกลุ่ม</option>
+                <option value="monthlyTrend">ยอดขายรายเดือน</option>
+                <option value="topCustomers">ลูกค้าซื้อสูงสุด</option>
+                <option value="profitMargin">Profit Margin ตามกลุ่ม</option>
+                <option value="qualityRows">แถวที่ควรตรวจสอบ</option>
+              </select></label>
+              <label>ตาราง<select id="learningTable"></select></label>
+              <label>คอลัมน์กลุ่ม<select id="learningGroup"></select></label>
+              <label>คอลัมน์ตัวเลข<select id="learningMetric"></select></label>
+            </div>
+            <div class="button-row">
+              <button id="learningBuildBtn" class="btn primary" type="button">สร้าง SQL</button>
+              <button id="learningRunBtn" class="btn secondary" type="button">รัน SQL นี้</button>
+              <button id="learningChartBtn" class="btn secondary" type="button">สร้างกราฟ</button>
+            </div>
+            <textarea id="learningSql" class="learning-sql" spellcheck="false">SELECT * FROM sales_data LIMIT 20;</textarea>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><h2>อธิบาย SQL แบบภาษาคน</h2><span class="pill">Beginner</span></div>
+            <div id="learningExplain" class="learning-explain empty-state">กด “สร้าง SQL” เพื่อดูคำอธิบาย SELECT, FROM, WHERE, GROUP BY, ORDER BY และ LIMIT</div>
+          </article>
+        </div>
+        <div class="grid-2">
+          <article class="panel result-panel">
+            <div class="panel-head"><h2>ผลลัพธ์จาก SQL</h2><span id="learningMeta" class="pill">Ready</span></div>
+            <div id="learningResult" class="data-table-wrap empty-state">ผลลัพธ์จะแสดงที่นี่</div>
+          </article>
+          <article class="panel chart-panel"><canvas id="learningChartCanvas"></canvas><div id="learningChartPlaceholder" class="empty-state">เมื่อผลลัพธ์มีคอลัมน์กลุ่มและตัวเลข สามารถสร้างกราฟได้</div></article>
+        </div>
+        <article class="panel checklist-panel">
+          <div class="panel-head"><h2>เส้นทางเรียน SQL สำหรับมือใหม่</h2></div>
+          <div class="lesson-roadmap">
+            <span>SELECT</span><span>WHERE</span><span>ORDER BY</span><span>COUNT / SUM / AVG</span><span>GROUP BY</span><span>JOIN</span><span>CTE</span><span>Business Insight</span>
+          </div>
+        </article>
+      </section>
+
+      <section id="view-data-quality" class="view">
+        <div class="page-header compact">
+          <div>
+            <h1>Data Quality Center</h1>
+            <p>ตรวจค่าว่าง วันที่ผิด ตัวเลขผิดปกติ คอลัมน์สำคัญหาย และแถวที่ควรไม่นำไปคำนวณ</p>
+          </div>
+          <button id="dqScanBtn" class="btn primary" type="button">Scan Current Table</button>
+        </div>
+        <div class="metrics-grid">
+          <article class="metric-card"><span>Rows</span><strong id="dqRows">0</strong><small>แถวในตาราง</small></article>
+          <article class="metric-card"><span>Issues</span><strong id="dqIssues">0</strong><small>ปัญหาที่พบ</small></article>
+          <article class="metric-card"><span>Missing</span><strong id="dqMissing">0%</strong><small>ค่าว่างทั้งหมด</small></article>
+          <article class="metric-card"><span>Risk</span><strong id="dqRisk">—</strong><small>ระดับความเสี่ยง</small></article>
+        </div>
+        <div class="grid-2">
+          <article class="panel">
+            <div class="panel-head"><h2>Issue Queue</h2><span id="dqTableBadge" class="pill">No table</span></div>
+            <div id="dqResult" class="data-table-wrap empty-state">กด Scan Current Table เพื่อตรวจข้อมูล</div>
+          </article>
+          <article class="panel checklist-panel">
+            <div class="panel-head"><h2>สิ่งที่ระบบควรตรวจ</h2></div>
+            <ul class="check-list">
+              <li>ค่าว่างในคอลัมน์สำคัญ เช่น วันที่ ลูกค้า สินค้า ยอดขาย</li>
+              <li>วันที่อ่านไม่ได้ หรือปี พ.ศ./ค.ศ. ผิด</li>
+              <li>ยอดขาย จำนวน ต้นทุน หรือกำไร ติดลบผิดปกติ</li>
+              <li>ส่วนลดมากกว่า 100% หรือไม่ใช่ตัวเลข</li>
+              <li>ข้อมูลซ้ำจาก order_id / transaction_id</li>
+              <li>แถวที่มี _exclude_from_analysis = 1 จะไม่ควรนำไปคำนวณ</li>
+            </ul>
+            <p class="note">หมายเหตุ: เวอร์ชัน GitHub Pages แก้ไขข้อมูลได้ใน Browser และ Export ออกไปใช้งานต่อ แต่ไม่มี Server กลางเก็บข้อมูล</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-privacy" class="view">
+        <div class="page-header compact">
+          <div>
+            <h1>Privacy & Public Demo</h1>
+            <p>เหมาะกับเว็บฟรีบน GitHub Pages: ไม่ส่งไฟล์ขึ้น Server, ตรวจคอลัมน์อ่อนไหว และแนะนำการ Mask ข้อมูลก่อนแชร์</p>
+          </div>
+          <button id="privacyScanBtn" class="btn primary" type="button">Scan Sensitive Columns</button>
+        </div>
+        <div class="grid-2">
+          <article class="panel">
+            <div class="panel-head"><h2>PII / Sensitive Column Detector</h2><span id="privacyBadge" class="pill">Browser only</span></div>
+            <div id="privacyResult" class="data-table-wrap empty-state">กด Scan Sensitive Columns เพื่อตรวจชื่อคอลัมน์ที่อาจเป็นข้อมูลส่วนบุคคล</div>
+          </article>
+          <article class="panel checklist-panel">
+            <div class="panel-head"><h2>คำแนะนำก่อนเผยแพร่ Demo</h2></div>
+            <ul class="check-list">
+              <li>อย่าใส่ข้อมูลจริงของลูกค้า พนักงาน เลขบัตรประชาชน เบอร์โทร หรืออีเมลใน repository</li>
+              <li>ใช้ sample data ที่สร้างขึ้นเองสำหรับ GitHub Pages</li>
+              <li>Mask เลขบัตร/เบอร์โทร/อีเมลก่อนนำไปสาธิต</li>
+              <li>อย่าใส่ MySQL password, API key หรือ token ไว้ใน frontend</li>
+              <li>ถ้าจะใช้ข้อมูลจริง ต้องมีระบบ Login, HTTPS, Backend และฐานข้อมูลที่กำหนดสิทธิ์</li>
+            </ul>
+            <div class="mask-demo">
+              <div><b>เลขบัตร:</b> 1234567890123 → <code>123******123</code></div>
+              <div><b>อีเมล:</b> customer@example.com → <code>cu***@example.com</code></div>
+              <div><b>เบอร์โทร:</b> 0812345678 → <code>081****678</code></div>
+            </div>
+          </article>
+        </div>
       </section>
 
 

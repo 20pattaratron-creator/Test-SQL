@@ -173,3 +173,16 @@ https://<github-username>.github.io/<repository-name>/
 ### หมายเหตุด้านความเป็นส่วนตัว
 
 ข้อมูลที่ผู้ใช้อัปโหลดจะประมวลผลใน browser เป็นหลัก แต่ถ้าเปิดใช้งานผ่าน CDN browser จะต้องโหลด library จากภายนอก เช่น sql.js, SheetJS และ Chart.js ดังนั้นถ้าต้องใช้กับข้อมูลลับมาก ควรพิจารณา self-host dependency ภายหลัง
+
+
+## v4.1 Complete Learning Update
+
+เวอร์ชันนี้เพิ่มเนื้อหาที่คุยกันไว้ลงในโค้ด `Data Analytics Studio` ล่าสุด โดยยังเป็น Static Web App สำหรับ GitHub Pages 100%:
+
+- **Smart Import Wizard**: อธิบาย workflow Excel/CSV หลาย Sheet, Mapping หัวตารางหลายภาษา, Date Parser ค.ศ./พ.ศ. และ checklist ก่อน import
+- **SQL Learning Mode**: ผู้ใช้มือใหม่เลือกคำถามธุรกิจ แล้วระบบสร้าง SQL, อธิบายทีละส่วน, รัน query และสร้างกราฟจากผลลัพธ์
+- **Data Quality Center**: ตรวจค่าว่าง วันที่อ่านไม่ได้ ตัวเลขผิดปกติ แถวที่ถูก exclude และรายการที่ควรแก้ไขก่อนคำนวณ
+- **Privacy & Public Demo**: ตรวจคอลัมน์ที่อาจเป็นข้อมูลส่วนบุคคล เช่น เลขบัตร เบอร์โทร อีเมล และแนะนำการ mask ข้อมูล
+- **Sample data ที่เหมาะกับ Dashboard**: ข้อมูลตัวอย่างมี customer_id, product_id, net_sales, profit, date parts และคอลัมน์ data quality
+
+ทุกอย่างทำงานใน Browser ผ่าน sql.js, SheetJS และ Chart.js จึงเหมาะกับการอัปขึ้น GitHub Pages ให้คนใช้ฟรีหรือ Fork ไปต่อยอด
