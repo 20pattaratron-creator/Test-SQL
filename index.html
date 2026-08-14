@@ -150,9 +150,25 @@
         <div class="page-header compact">
           <div><h1>Data View</h1><p id="dataSubtitle">แสดงข้อมูลแบบตาราง</p></div>
           <div class="page-actions">
+            <button id="addRowBtn" class="btn secondary">+ เพิ่มแถว / Add Row</button>
             <button id="exportCsvBtn" class="btn secondary">Export CSV</button>
           </div>
         </div>
+        <div class="edit-hint">💡 ดับเบิลคลิกที่ช่องข้อมูลเพื่อแก้ไข แล้วกด Enter เพื่อบันทึก หรือ Esc เพื่อยกเลิก / Double-click a cell to edit, Enter to save, Esc to cancel</div>
+        <details class="panel find-replace-panel">
+          <summary>🔎 ค้นหาและแทนที่ทั้งคอลัมน์ / Find &amp; Replace (bulk edit)</summary>
+          <div class="find-replace-body">
+            <label>คอลัมน์ / Column<select id="frColumn"></select></label>
+            <label>ค้นหา / Find<input id="frFind" type="text" placeholder="ค่าที่ต้องการค้นหา" /></label>
+            <label>แทนที่ด้วย / Replace with<input id="frReplace" type="text" placeholder="ค่าใหม่ (เว้นว่าง = NULL)" /></label>
+            <label class="fr-checkbox"><input id="frExact" type="checkbox" checked /> ต้องตรงทั้งหมด / Exact match (ไม่ติ๊ก = ค้นหาแบบมีคำนี้อยู่ / contains)</label>
+            <div class="fr-actions">
+              <button id="frPreviewBtn" class="btn secondary">ดูตัวอย่างจำนวนแถวที่จะเปลี่ยน / Preview count</button>
+              <button id="frApplyBtn" class="btn primary">แทนที่ทั้งหมด / Replace All</button>
+            </div>
+            <div id="frPreviewResult" class="fr-preview"></div>
+          </div>
+        </details>
         <div class="panel table-panel">
           <div id="dataTableWrap" class="data-table-wrap empty-state">ยังไม่มีข้อมูล</div>
         </div>

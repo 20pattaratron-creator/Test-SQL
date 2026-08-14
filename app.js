@@ -23,6 +23,7 @@ const state = {
   activeAnalysis: 'descriptives',
   totalRows: 0,
   snapshots: [],
+  rowsEditable: false,
 };
 const MAX_SNAPSHOTS = 5;
 
@@ -140,12 +141,22 @@ const analysisInfo = {
   },
 };
 
-function toast(message) {
+function toast(message, action) {
   const el = $('#toast');
-  el.textContent = message;
+  el.innerHTML = '';
+  const span = document.createElement('span');
+  span.textContent = message;
+  el.appendChild(span);
+  if (action) {
+    const btn = document.createElement('button');
+    btn.className = 'toast-action';
+    btn.textContent = action.label;
+    btn.addEventListener('click', () => { el.classList.remove('show'); clearTimeout(toast.timer); action.onClick(); });
+    el.appendChild(btn);
+  }
   el.classList.add('show');
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => el.classList.remove('show'), 2200);
+  toast.timer = setTimeout(() => el.classList.remove('show'), action ? 6000 : 2200);
 }
 
 // ===== IndexedDB persistence: auto-save the working database + dashboard so a
@@ -368,6 +379,14 @@ function bindEvents() {
   $('#sampleBtn').addEventListener('click', () => loadSampleData(true));
   $('#saveDbBtn').addEventListener('click', saveDatabase);
   $('#exportCsvBtn').addEventListener('click', exportCurrentCsv);
+  $('#addRowBtn').addEventListener('click', addRow);
+  bindDataTableEditing();
+  $('#frPreviewBtn')?.addEventListener('click', previewFindReplace);
+  $('#frApplyBtn')?.addEventListener('click', applyFindReplace);
+  $('#dqResult')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-jump-row]');
+    if (btn) jumpToRow(Number(btn.dataset.jumpRow));
+  });
   $('#runSqlBtn').addEventListener('click', runSql);
   $('#sqlEditor').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); runSql(); }});
   $('#formatSqlBtn').addEventListener('click', () => { $('#sqlEditor').value = state.currentTable ? `SELECT *\nFROM ${safeId(state.currentTable)}\nLIMIT 100;` : 'SELECT sqlite_version();'; });
@@ -684,14 +703,32 @@ function loadCurrentTable() {
 
   // Statistical procedures must use the complete table, not a silent preview sample.
   // The Data View still renders only the first 500 rows for UI performance.
-  const res = state.db.exec(`SELECT * FROM ${safeId(state.currentTable)}`)[0];
-  state.columns = res?.columns || state.schema.map(x=>x.name);
-  state.rows = res?.values.map(vals => Object.fromEntries(state.columns.map((c,i)=>[c, vals[i]]))) || [];
+  // rowid is fetched (aliased to avoid colliding with a real column of the same
+  // name) so cells/rows can be edited or deleted; WITHOUT ROWID tables (rare,
+  // only possible if created manually via the SQL Editor) fall back to a
+  // read-only preview instead of failing the whole query.
+  let res;
+  try {
+    res = state.db.exec(`SELECT rowid AS __da_rowid__, * FROM ${safeId(state.currentTable)}`)[0];
+    state.rowsEditable = true;
+  } catch {
+    res = state.db.exec(`SELECT * FROM ${safeId(state.currentTable)}`)[0];
+    state.rowsEditable = false;
+  }
+  const allCols = res?.columns || state.schema.map(x=>x.name);
+  const ridPos = allCols.indexOf('__da_rowid__');
+  state.columns = allCols.filter(c => c !== '__da_rowid__');
+  const colIndexes = state.columns.map(c => allCols.indexOf(c));
+  state.rows = res?.values.map(vals => {
+    const obj = Object.fromEntries(state.columns.map((c, j) => [c, vals[colIndexes[j]]]));
+    if (state.rowsEditable && ridPos >= 0) Object.defineProperty(obj, '__da_rowid__', { value: vals[ridPos], enumerable: false });
+    return obj;
+  }) || [];
   renderAll();
 }
 
 function renderAll() {
-  renderMetrics(); renderDataTable(); renderVariableView(); renderProfile(); renderAnalysisControls(); populateChartSelectors(); renderDashboard();
+  renderMetrics(); renderDataTable(); renderVariableView(); renderProfile(); renderAnalysisControls(); populateChartSelectors(); renderDashboard(); populateFindReplaceColumns();
   $('#dataSubtitle').textContent = state.currentTable
     ? `${state.currentTable} · Preview 500 rows / แสดงตัวอย่าง 500 แถว · Analysis uses all ${state.totalRows.toLocaleString()} rows / วิเคราะห์จากข้อมูลทั้งหมด`
     : 'แสดงข้อมูลแบบตาราง';
@@ -719,7 +756,243 @@ function renderDataTable() {
   if (!state.rows.length || !state.columns.length) { wrap.className='data-table-wrap empty-state'; wrap.textContent='ยังไม่มีข้อมูล'; return; }
   wrap.className='data-table-wrap';
   const preview = state.rows.slice(0,500);
-  wrap.innerHTML = `<table class="data-table"><thead><tr><th>#</th>${state.columns.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${preview.map((r,i)=>`<tr><td>${i+1}</td>${state.columns.map(c=>`<td title="${escapeHtml(r[c])}">${escapeHtml(r[c] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const editable = state.rowsEditable;
+  const notice = editable ? '' : '<div class="method-warning" style="margin:10px">ตารางนี้ไม่มี rowid (สร้างแบบ WITHOUT ROWID ผ่าน SQL Editor เอง) จึงแก้ไข/ลบทีละแถวไม่ได้ — ใช้ SQL Editor แทน / This table has no rowid, so per-row edit/delete is unavailable — use the SQL Editor instead.</div>';
+  wrap.innerHTML = `${notice}<table class="data-table editable-table"><thead><tr><th>#</th>${state.columns.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}${editable ? '<th></th>' : ''}</tr></thead><tbody>${preview.map((r,i)=>`<tr data-row-idx="${i}">
+    <td>${i+1}</td>
+    ${state.columns.map(c=>`<td class="${editable?'editable-cell':''}" ${editable?`data-col="${escapeHtml(c)}" data-row-idx="${i}" tabindex="0"`:''} title="${editable?'ดับเบิลคลิกเพื่อแก้ไข / Double-click to edit':escapeHtml(r[c])}">${escapeHtml(r[c] ?? '')}</td>`).join('')}
+    ${editable ? `<td class="row-actions"><button class="row-delete-btn" data-delete-row="${i}" title="ลบแถวนี้ / Delete row">🗑</button></td>` : ''}
+  </tr>`).join('')}</tbody></table>`;
+}
+
+function bindDataTableEditing() {
+  const wrap = $('#dataTableWrap');
+  wrap.addEventListener('dblclick', (e) => {
+    const td = e.target.closest('td.editable-cell');
+    if (td && !td.querySelector('input')) startCellEdit(td);
+  });
+  wrap.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-delete-row]');
+    if (btn) deleteRow(Number(btn.dataset.deleteRow));
+  });
+}
+
+function startCellEdit(td) {
+  const rowIdx = Number(td.dataset.rowIdx);
+  const col = td.dataset.col;
+  const row = state.rows[rowIdx];
+  if (!row) return;
+  const original = row[col] ?? '';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'cell-edit-input';
+  input.value = original;
+  td.textContent = '';
+  td.appendChild(input);
+  input.focus();
+  input.select();
+  const finish = (commit) => {
+    if (commit) commitCellEdit(rowIdx, col, input.value, original, td);
+    else { td.textContent = String(original ?? ''); }
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
+function columnSqlType(col) {
+  const entry = state.schema.find(s => s.name === col);
+  return (entry?.type || '').toUpperCase();
+}
+
+function looksNumericMismatch(col, value) {
+  if (value === null || value === '') return false;
+  const type = columnSqlType(col);
+  const isNumericType = /INT|REAL|FLOA|DOUB|NUM|DEC/.test(type);
+  return isNumericType && !Number.isFinite(Number(value));
+}
+
+function commitCellEdit(rowIdx, col, rawValue, original, td) {
+  const row = state.rows[rowIdx];
+  if (!row) return;
+  if (rawValue === String(original ?? '')) { td.textContent = String(original ?? ''); return; }
+  if (!state.rowsEditable || row.__da_rowid__ === undefined) {
+    toast('ตารางนี้แก้ไขทีละแถวไม่ได้ / This table cannot be edited row-by-row');
+    td.textContent = String(original ?? '');
+    return;
+  }
+  const value = rawValue.trim() === '' ? null : rawValue;
+  if (looksNumericMismatch(col, value)) {
+    const ok = confirm(`คอลัมน์ "${col}" เป็นชนิดตัวเลข (${columnSqlType(col)}) แต่ค่าที่กรอก "${rawValue}" ไม่ใช่ตัวเลข\nยังต้องการบันทึกอยู่หรือไม่? (การวิเคราะห์เชิงสถิติของคอลัมน์นี้อาจข้ามค่านี้ไป)\n\nColumn "${col}" is numeric (${columnSqlType(col)}) but "${rawValue}" is not a number. Save anyway? (statistical analyses on this column will treat it as missing)`);
+    if (!ok) { td.textContent = String(original ?? ''); return; }
+  }
+  const rowid = row.__da_rowid__;
+  try {
+    takeSnapshot(`Edit ${state.currentTable}.${col} (row ${rowIdx + 1})`);
+    state.db.run(`UPDATE ${safeId(state.currentTable)} SET ${safeId(col)} = ? WHERE rowid = ?`, [value, rowid]);
+    loadCurrentTable();
+    scheduleAutosave();
+    const tableAtEdit = state.currentTable;
+    toast('บันทึกแล้ว / Saved', {
+      label: 'เลิกทำ / Undo',
+      onClick: () => {
+        try {
+          state.db.run(`UPDATE ${safeId(tableAtEdit)} SET ${safeId(col)} = ? WHERE rowid = ?`, [original === '' ? null : original, rowid]);
+          loadCurrentTable();
+          scheduleAutosave();
+          toast('เลิกทำแล้ว / Undone');
+        } catch (err) { console.error(err); toast(`เลิกทำไม่สำเร็จ: ${err.message}`); }
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    toast(`บันทึกไม่สำเร็จ: ${err.message}`);
+    td.textContent = String(original ?? '');
+  }
+}
+
+function deleteRow(rowIdx) {
+  const row = state.rows[rowIdx];
+  if (!row || !state.rowsEditable || row.__da_rowid__ === undefined) {
+    return toast('ตารางนี้ลบทีละแถวไม่ได้ / This table cannot be edited row-by-row');
+  }
+  if (!confirm(`ลบแถวที่ ${rowIdx + 1}?\nDelete row ${rowIdx + 1}? A restore point will be kept — you can also Undo immediately after.`)) return;
+  const tableAtDelete = state.currentTable;
+  const rowid = row.__da_rowid__;
+  try {
+    takeSnapshot(`Delete row ${rowIdx + 1} from ${tableAtDelete}`);
+    state.db.run(`DELETE FROM ${safeId(tableAtDelete)} WHERE rowid = ?`, [rowid]);
+    loadCurrentTable();
+    scheduleAutosave();
+    toast('ลบแถวแล้ว / Row deleted', {
+      label: 'เลิกทำ / Undo',
+      onClick: () => {
+        try {
+          const insertColNames = ['rowid', ...state.columns.filter(c => c.toLowerCase() !== 'rowid')];
+          const insertValues = [rowid, ...state.columns.filter(c => c.toLowerCase() !== 'rowid').map(c => (row[c] === '' ? null : row[c]))];
+          const cols = insertColNames.map(safeId).join(',');
+          const placeholders = insertColNames.map(() => '?').join(',');
+          state.db.run(`INSERT INTO ${safeId(tableAtDelete)} (${cols}) VALUES (${placeholders})`, insertValues);
+          loadCurrentTable();
+          scheduleAutosave();
+          toast('กู้คืนแถวแล้ว / Row restored');
+        } catch (err) { console.error(err); toast(`กู้คืนไม่สำเร็จ: ${err.message}`); }
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    toast(`ลบไม่สำเร็จ: ${err.message}`);
+  }
+}
+
+function addRow() {
+  if (!state.db || !state.currentTable) return toast('กรุณาเลือกตารางก่อน / Select a table first');
+  if (!state.rowsEditable) return toast('ตารางนี้เพิ่มแถวผ่านหน้านี้ไม่ได้ / This table cannot be edited row-by-row');
+  const tableAtAdd = state.currentTable;
+  try {
+    takeSnapshot(`Add row to ${tableAtAdd}`);
+    const cols = state.columns.map(safeId).join(',');
+    const placeholders = state.columns.map(() => '?').join(',');
+    state.db.run(`INSERT INTO ${safeId(tableAtAdd)} (${cols}) VALUES (${placeholders})`, state.columns.map(() => null));
+    const newRowid = state.db.exec('SELECT last_insert_rowid()')[0]?.values?.[0]?.[0];
+    loadCurrentTable();
+    scheduleAutosave();
+    switchView('data');
+    toast('เพิ่มแถวใหม่แล้ว — ดับเบิลคลิกที่ช่องเพื่อกรอกข้อมูล / Row added — double-click a cell to fill it in', newRowid !== undefined ? {
+      label: 'เลิกทำ / Undo',
+      onClick: () => {
+        try {
+          state.db.run(`DELETE FROM ${safeId(tableAtAdd)} WHERE rowid = ?`, [newRowid]);
+          loadCurrentTable();
+          scheduleAutosave();
+          toast('เลิกทำแล้ว / Undone');
+        } catch (err) { console.error(err); toast(`เลิกทำไม่สำเร็จ: ${err.message}`); }
+      },
+    } : undefined);
+  } catch (err) {
+    console.error(err);
+    toast(`เพิ่มแถวไม่สำเร็จ: ${err.message}`);
+  }
+}
+
+function populateFindReplaceColumns() {
+  const sel = $('#frColumn');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = optionList(state.columns);
+  if (state.columns.includes(current)) sel.value = current;
+}
+
+function findReplaceClause(col, findValue, exact) {
+  if (exact) return { clause: `${safeId(col)} = ?`, params: [findValue] };
+  return { clause: `CAST(${safeId(col)} AS TEXT) LIKE ?`, params: [`%${findValue}%`] };
+}
+
+function previewFindReplace() {
+  if (!state.db || !state.currentTable) return toast('กรุณาเลือกตารางก่อน / Select a table first');
+  const col = $('#frColumn').value;
+  const findValue = $('#frFind').value;
+  const exact = $('#frExact').checked;
+  const out = $('#frPreviewResult');
+  if (!col) { out.textContent = ''; return; }
+  if (findValue === '') { out.textContent = 'กรุณากรอกค่าที่ต้องการค้นหา / Enter a value to find'; return; }
+  try {
+    const { clause, params } = findReplaceClause(col, findValue, exact);
+    const res = state.db.exec(`SELECT COUNT(*) FROM ${safeId(state.currentTable)} WHERE ${clause}`, params);
+    const count = res[0]?.values?.[0]?.[0] ?? 0;
+    out.textContent = count > 0
+      ? `จะเปลี่ยน ${count.toLocaleString('th-TH')} แถว / Will affect ${count.toLocaleString()} row(s)`
+      : 'ไม่พบแถวที่ตรงกับเงื่อนไข / No matching rows';
+  } catch (err) {
+    out.textContent = `ตรวจสอบไม่สำเร็จ: ${err.message}`;
+  }
+}
+
+function applyFindReplace() {
+  if (!state.db || !state.currentTable) return toast('กรุณาเลือกตารางก่อน / Select a table first');
+  const col = $('#frColumn').value;
+  const findValue = $('#frFind').value;
+  const replaceRaw = $('#frReplace').value;
+  const exact = $('#frExact').checked;
+  if (!col || findValue === '') return toast('กรุณาเลือกคอลัมน์และกรอกค่าที่ต้องการค้นหา / Choose a column and a value to find');
+  const replaceValue = replaceRaw === '' ? null : replaceRaw;
+  try {
+    const { clause, params } = findReplaceClause(col, findValue, exact);
+    const countRes = state.db.exec(`SELECT COUNT(*) FROM ${safeId(state.currentTable)} WHERE ${clause}`, params);
+    const count = countRes[0]?.values?.[0]?.[0] ?? 0;
+    if (!count) return toast('ไม่พบแถวที่ตรงกับเงื่อนไข ไม่มีอะไรให้แทนที่ / No matching rows — nothing to replace');
+    const ok = confirm(`แทนที่ค่าในคอลัมน์ "${col}" จำนวน ${count.toLocaleString('th-TH')} แถว ด้วย "${replaceRaw || '(NULL)'}" ?\nReplace ${col} in ${count} row(s) with "${replaceRaw || '(NULL)'}"? A restore point will be kept in History.`);
+    if (!ok) return;
+    takeSnapshot(`Find & Replace ${state.currentTable}.${col}: "${findValue}" → "${replaceRaw}" (${count} rows)`);
+    state.db.run(`UPDATE ${safeId(state.currentTable)} SET ${safeId(col)} = ? WHERE ${clause}`, [replaceValue, ...params]);
+    loadCurrentTable();
+    scheduleAutosave();
+    $('#frPreviewResult').textContent = '';
+    $('#frFind').value = ''; $('#frReplace').value = '';
+    toast(`แทนที่แล้ว ${count.toLocaleString('th-TH')} แถว / Replaced ${count} row(s)`);
+  } catch (err) {
+    console.error(err);
+    toast(`แทนที่ไม่สำเร็จ: ${err.message}`);
+  }
+}
+
+function jumpToRow(rowIdx) {
+  const row = state.rows[rowIdx];
+  switchView('data');
+  requestAnimationFrame(() => {
+    const tr = document.querySelector(`#dataTableWrap tr[data-row-idx="${rowIdx}"]`);
+    if (tr) {
+      tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      tr.classList.add('row-flash');
+      setTimeout(() => tr.classList.remove('row-flash'), 2200);
+    } else if (row && row.__da_rowid__ !== undefined) {
+      toast(`แถวนี้อยู่นอกช่วง preview 500 แถวแรก ใช้ SQL Editor: UPDATE ${state.currentTable} SET ... WHERE rowid = ${row.__da_rowid__}`);
+    } else {
+      toast('ไม่พบแถวนี้ในตารางปัจจุบัน / Row not found in the current table');
+    }
+  });
 }
 
 function variableMeta(c) {
@@ -1484,7 +1757,7 @@ function renderDataQualityCenter() {
   let missing = 0;
   for (const r of rows) for (const c of columns) if (isMissing(r[c])) missing++;
   const issues = [];
-  rows.forEach((row, i) => detectRowIssues(row, i).forEach(issue => issues.push({ row: i + 1, issue, sample: JSON.stringify(Object.fromEntries(Object.entries(row).slice(0, 4))) })));
+  rows.forEach((row, i) => detectRowIssues(row, i).forEach(issue => issues.push({ row: i + 1, idx: i, issue, sample: JSON.stringify(Object.fromEntries(Object.entries(row).slice(0, 4))) })));
   const duplicateCandidates = ['order_id','transaction_id','invoice_no'];
   for (const c of duplicateCandidates.filter(c => columns.includes(c))) {
     const seen = new Set(), dup = new Set();
@@ -1510,7 +1783,7 @@ function renderDataQualityCenter() {
     return;
   }
   result.className = 'data-table-wrap';
-  result.innerHTML = `<table class="data-table"><thead><tr><th>Row</th><th>Issue</th><th>Sample</th></tr></thead><tbody>${issues.slice(0, 500).map(x => `<tr><td>${escapeHtml(x.row)}</td><td>${escapeHtml(x.issue)}</td><td>${escapeHtml(x.sample)}</td></tr>`).join('')}</tbody></table>`;
+  result.innerHTML = `<table class="data-table"><thead><tr><th>Row</th><th>Issue</th><th>Sample</th><th></th></tr></thead><tbody>${issues.slice(0, 500).map(x => `<tr><td>${escapeHtml(x.row)}</td><td>${escapeHtml(x.issue)}</td><td>${escapeHtml(x.sample)}</td><td>${x.idx !== undefined ? `<button class="text-btn" data-jump-row="${x.idx}">แก้ไข / Edit</button>` : ''}</td></tr>`).join('')}</tbody></table>`;
 }
 
 function maskValue(v) {

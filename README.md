@@ -97,6 +97,12 @@ All statistical core tests passed.
 
 ```text
 data-analytics-studio/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml
+│       └── deploy.yml
+├── .gitignore
+├── .nojekyll
 ├── index.html
 ├── 404.html
 ├── manifest.json
@@ -105,12 +111,25 @@ data-analytics-studio/
 ├── app.js
 ├── statistics.js
 ├── statistics_test.mjs
+├── sample_sales.csv
+├── package.json
+├── LICENSE
+├── SECURITY.md
+├── CONTRIBUTING.md
 ├── FORMULA_REFERENCES.md
 ├── README.md
 └── THIRD_PARTY_NOTICES.md
 ```
 
 ## New in this update / อัปเดตล่าสุด
+
+- **Undo per edit**: editing a cell, deleting a row, or adding a row now shows an inline "เลิกทำ / Undo" button in the toast for 6 seconds — reverts just that one change instantly, without touching the full-database History snapshot.
+- **Type-mismatch warning**: editing a cell in a numeric (INTEGER/REAL) column with a non-numeric value now asks for confirmation before saving, explaining that statistical analyses will treat it as missing.
+- **Find & Replace (bulk edit)**: a collapsible panel in Data View lets you replace a value across an entire column in one action — choose the column, find value (exact or "contains"), replacement, preview the affected row count, then apply. A restore point is captured in History beforehand.
+- **Inline data editing** (previous update): double-click any cell in Data View to edit it directly — saves as a real SQL `UPDATE` behind the scenes. Add and delete rows directly from Data View too.
+- **Data Quality → Edit jump link**: each flagged issue in the Data Quality Center has an "แก้ไข / Edit" button that jumps straight to that row in Data View and highlights it.
+- **GitHub Actions CI + auto-deploy**: `.github/workflows/ci.yml` runs `npm run check` and `npm test` on every push/PR; `.github/workflows/deploy.yml` publishes straight to GitHub Pages on every push to `main`.
+- **SECURITY.md** added for vulnerability reporting guidance on the public repo.
 
 - **Nonparametric tests**: Mann-Whitney U, Wilcoxon Signed-Rank, and Kruskal-Wallis H are now available for skewed/ordinal data, with NIST-referenced formulas and bilingual output.
 - **Query snapshot / undo**: a restore point is automatically captured before any DROP/DELETE/TRUNCATE/UPDATE/ALTER query and before file imports or "New Database" that would overwrite existing data. Restore points are listed under the "History" button in the SQL Editor (last 5 kept, in-session only).
@@ -157,14 +176,21 @@ For high-stakes decisions, regulated work, or publication, independently validat
 
 ### วิธี Deploy บน GitHub Pages
 
-1. สร้าง repository ใหม่ใน GitHub
-2. Upload ไฟล์ทั้งหมดในโฟลเดอร์นี้ขึ้น repository
-3. เข้า `Settings → Pages`
-4. เลือก `Deploy from a branch`
-5. เลือก branch `main` และ folder `/root`
-6. กด Save
+**วิธีที่ 1 — อัตโนมัติ (แนะนำ):** repo นี้มี `.github/workflows/deploy.yml` อยู่แล้ว แค่:
+1. สร้าง repository ใหม่ใน GitHub แล้ว push ไฟล์ทั้งหมดขึ้น branch `main`
+2. เข้า `Settings → Pages → Build and deployment → Source` เลือก **GitHub Actions** (ครั้งเดียว)
+3. ทุกครั้งที่ push ขึ้น `main` เว็บจะ deploy ให้อัตโนมัติ (ดูสถานะได้ที่แท็บ Actions)
 
-หลังจาก deploy แล้วเว็บจะอยู่ที่:
+**วิธีที่ 2 — Manual:**
+1. สร้าง repository ใหม่ใน GitHub แล้ว Upload ไฟล์ทั้งหมดขึ้น repository
+2. เข้า `Settings → Pages`
+3. เลือก `Deploy from a branch`
+4. เลือก branch `main` และ folder `/ (root)`
+5. กด Save
+
+> **สำคัญ:** ไฟล์ `.gitignore` และ `.nojekyll` ต้องขึ้นต้นด้วยจุด (`.`) จริงๆ เวลา push ขึ้น GitHub — ถ้าดาวน์โหลดมาจากที่อื่นแล้วเห็นเป็น `_gitignore`/`_nojekyll` (ขีดเส้นใต้) ให้เปลี่ยนชื่อก่อน commit ไม่งั้น Jekyll อาจไปกรองไฟล์ที่ขึ้นต้นด้วย `_` ทิ้งโดยไม่ตั้งใจ
+
+หลังจาก deploy แล้วเว็บจะอยู่ที่ (แทนที่ด้วย username/repo ของคุณเอง):
 
 ```text
 https://<github-username>.github.io/<repository-name>/
